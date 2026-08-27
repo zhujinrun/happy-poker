@@ -4,6 +4,7 @@ package com.happy.poker.core.model
  * 牌型
  */
 enum class PatternType(val displayName: String, val priority: Int) {
+    Invalid("无效", 0),
     Single("单张", 1),
     Pair("对子", 2),
     Triple("三条", 3),
