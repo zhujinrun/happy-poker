@@ -1,0 +1,43 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build.yml"
+      - "app/**"
+      - "core/**"
+      - "gradle/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "gradlew"
+      - "gradlew.bat"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  build:
+    name: Android release APK
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build release APK
+        run: gradle --no-daemon :app:assembleRelease
+
+      - name: Rename release APK
+        run: cp app/build/outputs/apk/release/app-release.apk happy-poker.apk
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: happy-poker-release
+          path: happy-poker.apk
+          if-no-files-found: error
+          retention-days: 30
