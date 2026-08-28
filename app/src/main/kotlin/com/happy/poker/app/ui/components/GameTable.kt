@@ -104,7 +104,6 @@ fun CenterArea(
 ) {
     Box(
         modifier = modifier
-            .fillMaxWidth()
             .height(120.dp)
             .padding(horizontal = 32.dp),
         contentAlignment = androidx.compose.ui.Alignment.Center

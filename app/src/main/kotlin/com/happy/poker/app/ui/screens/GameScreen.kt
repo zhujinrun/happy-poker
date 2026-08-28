@@ -128,11 +128,12 @@ fun GameScreenContent(
                     )
                 }
                 
-                // 左侧玩家
+                // 玩家信息区域
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
+                        .weight(1f)
+                        .padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // 左侧玩家信息（玩家1）
@@ -146,15 +147,14 @@ fun GameScreenContent(
                                 PlayerRole.Farmer -> "农民"
                                 else -> ""
                             },
-                            isOnline = player1.isOnline,
-                            modifier = Modifier.padding(start = 16.dp)
+                            isOnline = player1.isOnline
                         )
                     }
                     
                     Spacer(modifier = Modifier.weight(1f))
                     
                     // 中间区域（出牌区）
-                    CenterArea {
+                    CenterArea(modifier = Modifier.weight(1f)) {
                         // 这里可以显示其他玩家出的牌
                     }
                     
@@ -171,8 +171,7 @@ fun GameScreenContent(
                                 PlayerRole.Farmer -> "农民"
                                 else -> ""
                             },
-                            isOnline = player2.isOnline,
-                            modifier = Modifier.padding(end = 16.dp)
+                            isOnline = player2.isOnline
                         )
                     }
                 }

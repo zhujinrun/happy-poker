@@ -59,7 +59,13 @@ data class HandPattern(
             if (type == PatternType.Bomb || type == PatternType.Rocket) {
                 append(" ${mainRank.displayName}")
             } else if (type == PatternType.Straight || type == PatternType.ConsecutivePairs) {
-                append(" ${mainRank.displayName}到${Rank.entries.first { it.value == mainRank.value - cardCount + groupCount }.displayName}")
+                val endValue = mainRank.value - cardCount + groupCount
+                val endRank = Rank.entries.firstOrNull { it.value == endValue }
+                if (endRank != null) {
+                    append(" ${mainRank.displayName}到${endRank.displayName}")
+                } else {
+                    append(" ${mainRank.displayName}")
+                }
             } else {
                 append(" ${mainRank.displayName}")
             }

@@ -111,7 +111,7 @@ fun PlayerInfo(
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier,
+        modifier = modifier.width(100.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // 玩家名称
@@ -119,7 +119,8 @@ fun PlayerInfo(
             text = playerName,
             color = TextWhite,
             fontSize = 14.sp,
-            fontWeight = FontWeight.Medium
+            fontWeight = FontWeight.Medium,
+            maxLines = 1
         )
         
         // 角色标签

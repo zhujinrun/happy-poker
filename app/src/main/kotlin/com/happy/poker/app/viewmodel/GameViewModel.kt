@@ -268,6 +268,14 @@ class GameViewModel : ViewModel() {
                         currentPlayerId = firstBidderId
                     )
                 }
+                
+                // 如果第一个叫地主的是AI玩家，延迟后自动叫地主
+                if (!isMyTurn) {
+                    viewModelScope.launch {
+                        delay(1000)
+                        handleAiBidTurn(firstBidderId)
+                    }
+                }
             }
 
             override fun onPlayerBid(playerId: String, playerName: String, bid: Int, isPass: Boolean) {
