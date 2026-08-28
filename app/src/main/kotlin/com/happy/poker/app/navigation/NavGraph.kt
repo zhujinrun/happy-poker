@@ -1,10 +1,12 @@
 package com.happy.poker.app.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.happy.poker.app.ui.screens.*
+import com.happy.poker.app.viewmodel.GameViewModel
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
@@ -17,7 +19,8 @@ sealed class Screen(val route: String) {
 @Composable
 fun NavGraph(
     navController: NavHostController,
-    startDestination: String = Screen.Home.route
+    startDestination: String = Screen.Home.route,
+    gameViewModel: GameViewModel = viewModel()
 ) {
     NavHost(
         navController = navController,
@@ -65,6 +68,7 @@ fun NavGraph(
         
         composable(Screen.Game.route) {
             GameScreen(
+                viewModel = gameViewModel,
                 onBackClick = {
                     navController.popBackStack()
                 }

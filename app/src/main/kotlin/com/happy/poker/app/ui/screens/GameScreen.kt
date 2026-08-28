@@ -13,12 +13,49 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.happy.poker.app.ui.components.*
 import com.happy.poker.app.ui.theme.*
+import com.happy.poker.app.viewmodel.GameViewModel
+import com.happy.poker.app.viewmodel.PlayerUiState
 import com.happy.poker.core.model.Card as GameCard
+import com.happy.poker.core.model.PlayerRole
 import com.happy.poker.core.model.Rank
 import com.happy.poker.core.model.Suit
 
 @Composable
 fun GameScreen(
+    viewModel: GameViewModel,
+    onBackClick: () -> Unit = {}
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    
+    // 显示错误信息
+    uiState.errorMessage?.let { message ->
+        LaunchedEffect(message) {
+            // 显示错误提示
+            viewModel.clearError()
+        }
+    }
+    
+    GameScreenContent(
+        playerCards = uiState.playerCards,
+        selectedCards = uiState.selectedCards,
+        onCardClick = { viewModel.selectCard(it.id) },
+        onPlayClick = { viewModel.playCards() },
+        onPassClick = { viewModel.pass() },
+        onHintClick = { /* TODO: 提示功能 */ },
+        onBidClick = { viewModel.bid(it) },
+        onBidPassClick = { viewModel.bidPass() },
+        isPlayTurn = uiState.isPlayTurn,
+        isBidTurn = uiState.isBidTurn,
+        currentBid = uiState.currentBid,
+        multiplier = uiState.multiplier,
+        players = uiState.players,
+        currentPlayerId = uiState.currentPlayerId,
+        onBackClick = onBackClick
+    )
+}
+
+@Composable
+fun GameScreenContent(
     playerCards: List<GameCard> = emptyList(),
     selectedCards: Set<String> = emptySet(),
     onCardClick: (GameCard) -> Unit = {},
@@ -31,6 +68,8 @@ fun GameScreen(
     isBidTurn: Boolean = false,
     currentBid: Int = 0,
     multiplier: Int = 1,
+    players: List<PlayerUiState> = emptyList(),
+    currentPlayerId: String? = null,
     onBackClick: () -> Unit = {}
 ) {
     Box(
@@ -86,13 +125,21 @@ fun GameScreen(
                         .weight(1f),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 左侧玩家信息
-                    PlayerInfo(
-                        playerName = "电脑1",
-                        cardCount = 17,
-                        role = "农民",
-                        modifier = Modifier.padding(start = 16.dp)
-                    )
+                    // 左侧玩家信息（玩家1）
+                    if (players.size > 1) {
+                        val player1 = players[1]
+                        PlayerInfo(
+                            playerName = player1.name,
+                            cardCount = player1.handSize,
+                            role = when (player1.role) {
+                                PlayerRole.Landlord -> "地主"
+                                PlayerRole.Farmer -> "农民"
+                                else -> ""
+                            },
+                            isOnline = player1.isOnline,
+                            modifier = Modifier.padding(start = 16.dp)
+                        )
+                    }
                     
                     Spacer(modifier = Modifier.weight(1f))
                     
@@ -103,13 +150,21 @@ fun GameScreen(
                     
                     Spacer(modifier = Modifier.weight(1f))
                     
-                    // 右侧玩家信息
-                    PlayerInfo(
-                        playerName = "电脑2",
-                        cardCount = 17,
-                        role = "农民",
-                        modifier = Modifier.padding(end = 16.dp)
-                    )
+                    // 右侧玩家信息（玩家2）
+                    if (players.size > 2) {
+                        val player2 = players[2]
+                        PlayerInfo(
+                            playerName = player2.name,
+                            cardCount = player2.handSize,
+                            role = when (player2.role) {
+                                PlayerRole.Landlord -> "地主"
+                                PlayerRole.Farmer -> "农民"
+                                else -> ""
+                            },
+                            isOnline = player2.isOnline,
+                            modifier = Modifier.padding(end = 16.dp)
+                        )
+                    }
                 }
                 
                 // 底部区域（自己的手牌和操作）
@@ -150,10 +205,15 @@ fun GameScreen(
                     )
                     
                     // 自己的玩家信息
+                    val humanPlayer = players.find { it.id == "human_player" }
                     PlayerInfo(
-                        playerName = "我",
+                        playerName = humanPlayer?.name ?: "我",
                         cardCount = playerCards.size,
-                        role = "地主",
+                        role = when (humanPlayer?.role) {
+                            PlayerRole.Landlord -> "地主"
+                            PlayerRole.Farmer -> "农民"
+                            else -> ""
+                        },
                         modifier = Modifier.padding(top = 8.dp)
                     )
                 }
@@ -182,12 +242,19 @@ fun GameScreenPreview() {
         GameCard(Rank.BigJoker, Suit.Joker)
     )
     
+    val samplePlayers = listOf(
+        PlayerUiState("human_player", "我", PlayerRole.Unknown, 15),
+        PlayerUiState("ai_1", "电脑1", PlayerRole.Unknown, 17),
+        PlayerUiState("ai_2", "电脑2", PlayerRole.Unknown, 17)
+    )
+    
     HappyPokerTheme {
-        GameScreen(
+        GameScreenContent(
             playerCards = sampleCards,
             selectedCards = setOf("4♥", "5♦"),
             isPlayTurn = true,
-            multiplier = 2
+            multiplier = 2,
+            players = samplePlayers
         )
     }
 }
