@@ -1,6 +1,8 @@
 package com.happy.poker.app.navigation
 
+import android.app.Application
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -8,6 +10,7 @@ import androidx.navigation.compose.composable
 import com.happy.poker.app.ui.screens.*
 import com.happy.poker.app.viewmodel.GameViewModel
 import com.happy.poker.app.viewmodel.MultiplayerGameViewModel
+import com.happy.poker.app.network.MqttConfigManager
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
@@ -16,6 +19,7 @@ sealed class Screen(val route: String) {
     object Game : Screen("game")
     object MultiplayerGame : Screen("multiplayer_game")
     object Result : Screen("result")
+    object Settings : Screen("settings")
 }
 
 @Composable
@@ -25,6 +29,9 @@ fun NavGraph(
     gameViewModel: GameViewModel = viewModel(),
     multiplayerViewModel: MultiplayerGameViewModel = viewModel()
 ) {
+    val context = LocalContext.current
+    val mqttConfigManager = MqttConfigManager(context)
+
     NavHost(
         navController = navController,
         startDestination = startDestination
@@ -38,7 +45,7 @@ fun NavGraph(
                     navController.navigate(Screen.RoomList.route)
                 },
                 onSettingsClick = {
-                    // TODO: 导航到设置页面
+                    navController.navigate(Screen.Settings.route)
                 }
             )
         }
@@ -104,6 +111,18 @@ fun NavGraph(
                             inclusive = true
                         }
                     }
+                }
+            )
+        }
+
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                mqttConfigManager = mqttConfigManager,
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onSaveClick = {
+                    // 保存设置后可以显示提示
                 }
             )
         }

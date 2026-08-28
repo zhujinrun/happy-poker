@@ -1,8 +1,10 @@
 package com.happy.poker.app.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.happy.poker.app.network.ConnectionState
+import com.happy.poker.app.network.MqttConfigManager
 import com.happy.poker.app.network.ReconnectManager
 import com.happy.poker.core.model.*
 import com.happy.poker.core.network.*
@@ -39,7 +41,7 @@ data class MultiplayerGameUiState(
     val connectionState: ConnectionState = ConnectionState.DISCONNECTED
 )
 
-class MultiplayerGameViewModel : ViewModel() {
+class MultiplayerGameViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(MultiplayerGameUiState())
     val uiState: StateFlow<MultiplayerGameUiState> = _uiState.asStateFlow()
 
@@ -47,6 +49,7 @@ class MultiplayerGameViewModel : ViewModel() {
     private val humanPlayerId: String = "human_player_${System.currentTimeMillis()}"
     private var currentRoomId: String = ""
     private val reconnectManager = ReconnectManager()
+    private val mqttConfigManager = MqttConfigManager(application)
 
     init {
         reconnectManager.init(viewModelScope) { reconnect() }
@@ -57,7 +60,8 @@ class MultiplayerGameViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 updateUiState { it.copy(connectionState = ConnectionState.CONNECTING) }
-                mqttClient.connect()
+                val config = mqttConfigManager.getMqttConnectionConfig()
+                mqttClient.connect(config)
                 reconnectManager.onConnected()
                 updateUiState { it.copy(isConnected = true, connectionState = ConnectionState.CONNECTED) }
                 setupMessageHandlers()
@@ -77,7 +81,8 @@ class MultiplayerGameViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 updateUiState { it.copy(connectionState = ConnectionState.RECONNECTING) }
-                mqttClient.connect()
+                val config = mqttConfigManager.getMqttConnectionConfig()
+                mqttClient.connect(config)
                 reconnectManager.onConnected()
                 updateUiState { it.copy(isConnected = true, connectionState = ConnectionState.CONNECTED) }
                 setupMessageHandlers()
