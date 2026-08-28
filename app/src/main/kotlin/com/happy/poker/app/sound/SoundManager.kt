@@ -9,17 +9,24 @@ import com.happy.poker.app.R
  * 音效类型
  */
 enum class SoundType(val resId: Int) {
-    CARD_PLAY(R.raw.card_play),      // 出牌音效
-    CARD_PASS(R.raw.card_pass),      // 过牌音效
-    BID_HIGH(R.raw.bid_high),       // 叫高分音效
-    BID_PASS(R.raw.bid_pass),       // 不叫音效
-    WIN(R.raw.win),            // 胜利音效
-    LOSE(R.raw.lose),           // 失败音效
-    BOMB(R.raw.bomb),           // 炸弹音效
-    ROCKET(R.raw.rocket),         // 火箭音效
-    SPRING(R.raw.spring),         // 春天音效
-    BUTTON_CLICK(R.raw.button_click),   // 按钮点击音效
-    CARD_SELECT(R.raw.card_select)     // 选牌音效
+    CARD_PLAY(R.raw.card_single),       // 出牌音效
+    CARD_PAIR(R.raw.card_pair),         // 对子音效
+    CARD_TRIPLE(R.raw.card_triple),     // 三条音效
+    CARD_STRAIGHT(R.raw.card_straight), // 顺子音效
+    CARD_PLANE(R.raw.card_plane),       // 飞机音效
+    CARD_PASS(R.raw.pass1),             // 过牌音效
+    BID_HIGH(R.raw.multiplier),         // 叫高分音效
+    BID_PASS(R.raw.pass2),              // 不叫音效
+    WIN(R.raw.win),                     // 胜利音效
+    LOSE(R.raw.alarm),                  // 失败音效
+    BOMB(R.raw.bomb),                   // 炸弹音效
+    BOMB_SPECIAL(R.raw.bomb_special),   // 特殊炸弹音效
+    ROCKET(R.raw.rocket),               // 火箭音效
+    ROCKET_SPECIAL(R.raw.rocket_special), // 特殊火箭音效
+    SPRING(R.raw.spring),               // 春天音效
+    MULTIPLIER(R.raw.multiplier),       // 倍数音效
+    BUTTON_CLICK(R.raw.pass1),          // 按钮点击音效
+    CARD_SELECT(R.raw.card_single)      // 选牌音效
 }
 
 /**
@@ -46,7 +53,6 @@ class SoundManager(private val context: Context) {
             .setAudioAttributes(audioAttributes)
             .build()
 
-        // 加载音效资源
         loadSounds()
     }
 
@@ -60,7 +66,6 @@ class SoundManager(private val context: Context) {
             }
             isLoaded = true
         } catch (e: Exception) {
-            // 加载失败，使用静音模式
             isLoaded = false
         }
     }
