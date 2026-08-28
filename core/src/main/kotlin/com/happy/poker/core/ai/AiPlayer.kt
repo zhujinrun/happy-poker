@@ -2,6 +2,7 @@ package com.happy.poker.core.ai
 
 import com.happy.poker.core.flow.GameFlow
 import com.happy.poker.core.model.*
+import com.happy.poker.core.rules.Validator
 
 /**
  * AI玩家
@@ -35,7 +36,11 @@ class AiPlayer(
      * 自动叫地主
      */
     fun autoBid(gameFlow: GameFlow, currentBid: Int): Boolean {
-        val bid = decideBid(gameFlow, currentBid)
+        val state = gameFlow.getState()
+        if (state.state != RoomState.Bidding || state.currentPlayerId != player.id) return false
+
+        val suggestedBid = decideBid(gameFlow, currentBid).coerceIn(0, 3)
+        val bid = if (suggestedBid > currentBid) suggestedBid else 0
         return gameFlow.playerBid(player.id, bid)
     }
 
@@ -48,12 +53,25 @@ class AiPlayer(
         isLandlord: Boolean,
         landlordHandSize: Int
     ): Boolean {
-        val cards = decidePlay(gameFlow, lastPattern, isLandlord, landlordHandSize)
+        val state = gameFlow.getState()
+        if (state.state != RoomState.Playing || state.currentPlayerId != player.id) return false
 
-        return if (cards != null && cards.isNotEmpty()) {
-            gameFlow.playerPlay(player.id, cards)
-        } else {
-            gameFlow.playerPass(player.id)
+        val previousPattern = when {
+            state.lastPlayedCards.isNullOrEmpty() -> null
+            state.lastPlayedPlayerId == player.id -> null
+            else -> lastPattern ?: state.lastPlayedPattern
+        }
+        val cards = decidePlay(gameFlow, previousPattern, isLandlord, landlordHandSize)
+        val legalCards = cards
+            ?.takeIf { it.isNotEmpty() }
+            ?.takeIf { player.hasCards(it) }
+            ?.takeIf { Validator.validatePlay(it, previousPattern).isValid }
+
+        return when {
+            legalCards != null -> gameFlow.playerPlay(player.id, legalCards)
+            previousPattern != null -> gameFlow.playerPass(player.id)
+            player.hand.isNotEmpty() -> gameFlow.playerPlay(player.id, listOf(player.hand.sortedByGameOrder().first()))
+            else -> false
         }
     }
 }

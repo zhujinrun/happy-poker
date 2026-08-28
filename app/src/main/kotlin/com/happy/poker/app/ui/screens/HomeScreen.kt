@@ -1,7 +1,11 @@
 package com.happy.poker.app.ui.screens
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -11,10 +15,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.happy.poker.app.R
 import com.happy.poker.app.ui.theme.*
 
 @Composable
@@ -36,17 +44,23 @@ fun HomeScreen(
     )
     
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        TableGradientStart,
-                        TableGradientEnd
-                    )
-                )
-            )
+        modifier = Modifier.fillMaxSize()
     ) {
+        // 背景图片
+        Image(
+            painter = painterResource(id = R.drawable.home_bg),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        
+        // 半透明遮罩
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.3f))
+        )
+        
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -54,100 +68,50 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            // Logo
+            Image(
+                painter = painterResource(id = R.drawable.landlord_hat_icon),
+                contentDescription = "Logo",
+                modifier = Modifier
+                    .height(100.dp)
+                    .padding(bottom = 8.dp)
+                    .scale(titleScale),
+                contentScale = ContentScale.Fit
+            )
+            
             // 游戏标题（带动画）
             Text(
                 text = "欢乐斗地主",
-                fontSize = 48.sp,
+                fontSize = 42.sp,
                 fontWeight = FontWeight.Bold,
                 color = Gold500,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
-                    .padding(bottom = 16.dp)
+                    .padding(bottom = 32.dp)
                     .scale(titleScale)
             )
             
-            Text(
-                text = "Happy Poker",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Light,
-                color = TextWhite,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(bottom = 64.dp)
-            )
-            
-            // 单机模式按钮
-            Button(
-                onClick = onSinglePlayerClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp)
-                    .padding(horizontal = 32.dp),
-                shape = RoundedCornerShape(30.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Gold500,
-                    contentColor = CardBlack
-                ),
-                elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation = 8.dp,
-                    pressedElevation = 4.dp
-                )
+            // 按钮一排展示
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
             ) {
-                Text(
-                    text = "单机对战",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
+                SmallMenuButton(
+                    text = "单机",
+                    onClick = onSinglePlayerClick,
+                    normalRes = R.drawable.btn_blue
                 )
-            }
-            
-            Spacer(modifier = Modifier.height(20.dp))
-            
-            // 多人模式按钮
-            Button(
-                onClick = onMultiplayerClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp)
-                    .padding(horizontal = 32.dp),
-                shape = RoundedCornerShape(30.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Green600,
-                    contentColor = TextWhite
-                ),
-                elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation = 8.dp,
-                    pressedElevation = 4.dp
+                
+                SmallMenuButton(
+                    text = "联机",
+                    onClick = onMultiplayerClick,
+                    normalRes = R.drawable.btn_orange
                 )
-            ) {
-                Text(
-                    text = "多人对战",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(20.dp))
-            
-            // 设置按钮
-            OutlinedButton(
-                onClick = onSettingsClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp)
-                    .padding(horizontal = 32.dp),
-                shape = RoundedCornerShape(30.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = TextWhite
-                ),
-                border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(TextWhite, Gold500)
-                    )
-                )
-            ) {
-                Text(
+                
+                SmallMenuButton(
                     text = "设置",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Medium
+                    onClick = onSettingsClick,
+                    normalRes = R.drawable.btn_green
                 )
             }
         }
@@ -160,6 +124,50 @@ fun HomeScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(16.dp)
+        )
+    }
+}
+
+@Composable
+private fun SmallMenuButton(
+    text: String,
+    onClick: () -> Unit,
+    normalRes: Int = R.drawable.btn_blue,
+    pressedRes: Int? = null
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    
+    Box(
+        modifier = Modifier
+            .width(90.dp)
+            .height(40.dp)
+            .scale(if (isPressed) 0.96f else 1f)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+    ) {
+        Image(
+            painter = painterResource(
+                id = pressedRes?.takeIf { isPressed } ?: normalRes
+            ),
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    alpha = if (isPressed && pressedRes == null) 0.84f else 1f
+                },
+            contentScale = ContentScale.FillBounds
+        )
+        
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = TextWhite,
+            modifier = Modifier.align(Alignment.Center)
         )
     }
 }

@@ -6,8 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.happy.poker.app.network.ConnectionState
 import com.happy.poker.app.network.MqttConfigManager
 import com.happy.poker.app.network.ReconnectManager
+import com.happy.poker.core.ai.AiEvaluator
 import com.happy.poker.core.model.*
 import com.happy.poker.core.network.*
+import com.happy.poker.core.rules.Validator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,6 +38,8 @@ data class MultiplayerGameUiState(
     val lastPlayedPattern: HandPattern? = null,
     val gameResult: GameResult? = null,
     val errorMessage: String? = null,
+    val feedbackMessage: String? = null,
+    val feedbackId: Int = 0,
     val isConnected: Boolean = false,
     val isSearching: Boolean = false,
     val connectionState: ConnectionState = ConnectionState.DISCONNECTED
@@ -67,12 +71,8 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                 setupMessageHandlers()
             } catch (e: Exception) {
                 reconnectManager.onError(e)
-                updateUiState { 
-                    it.copy(
-                        errorMessage = "连接服务器失败: ${e.message}",
-                        connectionState = ConnectionState.ERROR
-                    ) 
-                }
+                updateUiState { it.copy(connectionState = ConnectionState.ERROR) }
+                showFeedback("连接服务器失败: ${e.message}")
             }
         }
     }
@@ -197,7 +197,14 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
 
         val selectedCards = state.playerCards.filter { it.id in state.selectedCards }
         if (selectedCards.isEmpty()) {
-            updateUiState { it.copy(errorMessage = "请先选择要出的牌") }
+            showFeedback("请先选择要出的牌")
+            return
+        }
+
+        val previousPattern = if (state.lastPlayedCards.isNullOrEmpty()) null else state.lastPlayedPattern
+        val validation = Validator.validatePlay(selectedCards, previousPattern)
+        if (!validation.isValid) {
+            showFeedback(validation.reason.ifBlank { "不符合出牌规则" })
             return
         }
 
@@ -214,6 +221,11 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     fun pass() {
         val state = _uiState.value
         if (!state.isPlayTurn) return
+
+        if (state.lastPlayedCards.isNullOrEmpty()) {
+            showFeedback("本轮需要先出牌，不能不出")
+            return
+        }
 
         viewModelScope.launch {
             val message = GamePassMessage(
@@ -242,6 +254,45 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
         bid(0)
     }
 
+    fun hintPlay() {
+        val state = _uiState.value
+        if (!state.isPlayTurn) {
+            showFeedback("还没轮到你出牌")
+            return
+        }
+
+        val humanPlayer = state.room.players.find { it.id == humanPlayerId }
+        val isLandlord = humanPlayer?.role == PlayerRole.Landlord
+        val landlordHandSize = state.room.players
+            .firstOrNull { it.role == PlayerRole.Landlord }
+            ?.handSize ?: 0
+        val previousPattern = if (state.lastPlayedCards.isNullOrEmpty()) null else state.lastPlayedPattern
+        val suggestion = AiEvaluator.suggestBestPlay(
+            hand = state.playerCards,
+            lastPattern = previousPattern,
+            isLandlord = isLandlord,
+            landlordHandSize = landlordHandSize
+        )
+
+        if (suggestion.isNullOrEmpty()) {
+            updateUiState { it.copy(selectedCards = emptySet()) }
+            showFeedback("提示：没有能压过上家的牌，可以选择不出")
+            return
+        }
+
+        val validation = Validator.validatePlay(suggestion, previousPattern)
+        if (!validation.isValid) {
+            updateUiState { it.copy(selectedCards = emptySet()) }
+            showFeedback("提示：暂时没有合适的出牌")
+            return
+        }
+
+        updateUiState {
+            it.copy(selectedCards = suggestion.map { card -> card.id }.toSet())
+        }
+        showFeedback("提示：已选中 ${suggestion.toCardText()}")
+    }
+
     fun refreshRoomList() {
         viewModelScope.launch {
             val message = RoomListMessage()
@@ -250,11 +301,21 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun clearError() {
-        updateUiState { it.copy(errorMessage = null) }
+        updateUiState { it.copy(errorMessage = null, feedbackMessage = null) }
     }
 
     private fun updateUiState(update: (MultiplayerGameUiState) -> MultiplayerGameUiState) {
         _uiState.value = update(_uiState.value)
+    }
+
+    private fun showFeedback(message: String) {
+        updateUiState {
+            it.copy(
+                errorMessage = null,
+                feedbackMessage = message,
+                feedbackId = it.feedbackId + 1
+            )
+        }
     }
 
     private fun handleRoomCreated(message: RoomCreatedMessage) {
@@ -388,7 +449,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     }
 
     private fun handleError(message: ErrorMessage) {
-        updateUiState { it.copy(errorMessage = message.message) }
+        showFeedback(message.message)
     }
 
     override fun onCleared() {

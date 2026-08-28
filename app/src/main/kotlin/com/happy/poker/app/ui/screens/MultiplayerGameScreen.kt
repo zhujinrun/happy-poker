@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.happy.poker.app.ui.components.*
 import com.happy.poker.app.ui.theme.*
 import com.happy.poker.app.viewmodel.MultiplayerGameViewModel
@@ -18,8 +19,10 @@ import com.happy.poker.app.viewmodel.PlayerUiState
 import com.happy.poker.app.effects.SpecialEffectOverlay
 import com.happy.poker.app.effects.SpecialEffectsManager
 import com.happy.poker.core.model.Card as GameCard
+import com.happy.poker.core.model.PatternType
 import com.happy.poker.core.model.PlayerRole
 import com.happy.poker.core.model.RoomState
+import kotlinx.coroutines.delay
 
 @Composable
 fun MultiplayerGameScreen(
@@ -29,19 +32,34 @@ fun MultiplayerGameScreen(
     val uiState by viewModel.uiState.collectAsState()
     val specialEffectsManager = remember { SpecialEffectsManager() }
     val specialEffectState by specialEffectsManager.effectState.collectAsState()
-    
-    // 显示错误信息
-    uiState.errorMessage?.let { message ->
-        LaunchedEffect(message) {
-            // 显示错误提示
+    var feedbackMessage by remember { mutableStateOf<String?>(null) }
+    var visibleFeedbackId by remember { mutableStateOf(0) }
+
+    LaunchedEffect(uiState.feedbackId, uiState.feedbackMessage) {
+        val message = uiState.feedbackMessage
+        val feedbackId = uiState.feedbackId
+        if (message.isNullOrBlank()) {
+            feedbackMessage = null
+            return@LaunchedEffect
+        }
+
+        feedbackMessage = message
+        visibleFeedbackId = feedbackId
+        delay(1800)
+        if (visibleFeedbackId == feedbackId) {
+            feedbackMessage = null
             viewModel.clearError()
         }
     }
     
     // 监听倍数变化以触发特效
-    LaunchedEffect(uiState.multiplier) {
+    LaunchedEffect(uiState.multiplier, uiState.lastPlayedPattern?.type) {
         if (uiState.multiplier > 1) {
-            specialEffectsManager.triggerBombEffect(uiState.multiplier, 1)
+            if (uiState.lastPlayedPattern?.type == PatternType.Rocket) {
+                specialEffectsManager.triggerRocketEffect(uiState.multiplier)
+            } else {
+                specialEffectsManager.triggerBombEffect(uiState.multiplier, 1)
+            }
         }
     }
     
@@ -60,12 +78,15 @@ fun MultiplayerGameScreen(
                 onCardClick = { viewModel.selectCard(it.id) },
                 onPlayClick = { viewModel.playCards() },
                 onPassClick = { viewModel.pass() },
+                onHintClick = { viewModel.hintPlay() },
                 onBidClick = { viewModel.bid(it) },
                 onBidPassClick = { viewModel.bidPass() },
                 isPlayTurn = uiState.isPlayTurn,
                 isBidTurn = uiState.isBidTurn,
                 currentBid = uiState.currentBid,
                 multiplier = uiState.multiplier,
+                bottomCards = uiState.bottomCards,
+                lastPlayedCards = uiState.lastPlayedCards,
                 players = uiState.room.players,
                 onBackClick = onBackClick
             )
@@ -77,6 +98,9 @@ fun MultiplayerGameScreen(
                             PlayerRole.Farmer -> "农民"
                             else -> "未知"
                         },
+                        isLandlordWin = uiState.room.players.find { it.name == "我" }?.let { player ->
+                            player.role == result.winnerRole || player.id == result.winnerId
+                        } ?: true,
                         players = uiState.room.players.map { player ->
                             com.happy.poker.app.ui.screens.PlayerResult(
                                 name = player.name,
@@ -91,7 +115,7 @@ fun MultiplayerGameScreen(
                         },
                         multiplier = result.multiplier,
                         onBackToHomeClick = onBackClick,
-                        onPlayAgainClick = { /* TODO: 再来一局 */ }
+                        onPlayAgainClick = { viewModel.startGame() }
                     )
                 }
             }
@@ -101,6 +125,14 @@ fun MultiplayerGameScreen(
         SpecialEffectOverlay(
             effectState = specialEffectState,
             onEffectComplete = { specialEffectsManager.stopEffect() }
+        )
+
+        GameFeedbackToast(
+            message = feedbackMessage,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset(y = 118.dp)
+                .zIndex(20f)
         )
     }
 }
@@ -279,153 +311,34 @@ fun GameContent(
     onCardClick: (GameCard) -> Unit = {},
     onPlayClick: () -> Unit = {},
     onPassClick: () -> Unit = {},
+    onHintClick: () -> Unit = {},
     onBidClick: (Int) -> Unit = {},
     onBidPassClick: () -> Unit = {},
     isPlayTurn: Boolean = false,
     isBidTurn: Boolean = false,
     currentBid: Int = 0,
     multiplier: Int = 1,
+    bottomCards: List<GameCard> = emptyList(),
+    lastPlayedCards: List<GameCard>? = null,
     players: List<PlayerUiState> = emptyList(),
     onBackClick: () -> Unit = {}
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        TableGradientStart,
-                        TableGradientEnd
-                    )
-                )
-            )
-    ) {
-        GameTable {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                // 顶部信息区
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Button(
-                        onClick = onBackClick,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent
-                        )
-                    ) {
-                        Text(
-                            text = "返回",
-                            color = TextWhite
-                        )
-                    }
-                    
-                    GameInfo(
-                        multiplier = multiplier,
-                        bottomCards = 3
-                    )
-                }
-                
-                // 玩家区域
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // 左侧玩家
-                    if (players.size > 1) {
-                        val player1 = players[1]
-                        PlayerInfo(
-                            playerName = player1.name,
-                            cardCount = player1.handSize,
-                            role = when (player1.role) {
-                                PlayerRole.Landlord -> "地主"
-                                PlayerRole.Farmer -> "农民"
-                                else -> ""
-                            },
-                            isOnline = player1.isOnline,
-                            modifier = Modifier.padding(start = 16.dp)
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.weight(1f))
-                    
-                    CenterArea {
-                        // 出牌区
-                    }
-                    
-                    Spacer(modifier = Modifier.weight(1f))
-                    
-                    // 右侧玩家
-                    if (players.size > 2) {
-                        val player2 = players[2]
-                        PlayerInfo(
-                            playerName = player2.name,
-                            cardCount = player2.handSize,
-                            role = when (player2.role) {
-                                PlayerRole.Landlord -> "地主"
-                                PlayerRole.Farmer -> "农民"
-                                else -> ""
-                            },
-                            isOnline = player2.isOnline,
-                            modifier = Modifier.padding(end = 16.dp)
-                        )
-                    }
-                }
-                
-                // 底部区域
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    if (isBidTurn) {
-                        BidPanel(
-                            currentBid = currentBid,
-                            onBidClick = onBidClick,
-                            onPassClick = onBidPassClick
-                        )
-                    }
-                    
-                    if (isPlayTurn) {
-                        PlayPanel(
-                            onPlayClick = onPlayClick,
-                            onPassClick = onPassClick,
-                            onHintClick = { },
-                            isPlayTurn = isPlayTurn,
-                            canPass = true
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    HandCards(
-                        cards = playerCards,
-                        selectedCards = selectedCards,
-                        onCardClick = onCardClick,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
-                    
-                    val humanPlayer = players.find { it.id.contains("human_player") }
-                    PlayerInfo(
-                        playerName = humanPlayer?.name ?: "我",
-                        cardCount = playerCards.size,
-                        role = when (humanPlayer?.role) {
-                            PlayerRole.Landlord -> "地主"
-                            PlayerRole.Farmer -> "农民"
-                            else -> ""
-                        },
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-            }
-        }
-    }
+    GameScreenContent(
+        playerCards = playerCards,
+        selectedCards = selectedCards,
+        onCardClick = onCardClick,
+        onPlayClick = onPlayClick,
+        onPassClick = onPassClick,
+        onHintClick = onHintClick,
+        onBidClick = onBidClick,
+        onBidPassClick = onBidPassClick,
+        isPlayTurn = isPlayTurn,
+        isBidTurn = isBidTurn,
+        currentBid = currentBid,
+        multiplier = multiplier,
+        bottomCards = bottomCards,
+        players = players,
+        lastPlayedCards = lastPlayedCards,
+        onBackClick = onBackClick
+    )
 }

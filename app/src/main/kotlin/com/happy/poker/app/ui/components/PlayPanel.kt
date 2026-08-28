@@ -6,9 +6,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.happy.poker.app.R
 import com.happy.poker.app.ui.theme.*
 
 @Composable
@@ -25,7 +27,6 @@ fun PlayPanel(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 提示文字
         if (isPlayTurn) {
             Text(
                 text = "轮到你出牌",
@@ -36,68 +37,40 @@ fun PlayPanel(
             )
         }
         
-        // 操作按钮
         Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // 提示按钮
-            OutlinedButton(
+            PokerImageButton(
+                text = "提示",
                 onClick = onHintClick,
+                normalRes = R.drawable.btn_orange,
+                enabled = isPlayTurn,
+                fontSize = 14.sp,
                 modifier = Modifier
-                    .width(80.dp)
-                    .height(44.dp),
-                shape = RoundedCornerShape(22.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = TextWhite
-                ),
-                enabled = isPlayTurn
-            ) {
-                Text(
-                    text = "提示",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
+                    .width(76.dp)
+                    .height(36.dp)
+            )
             
-            // 不出按钮
-            Button(
+            PokerImageButton(
                 onClick = onPassClick,
+                normalRes = R.drawable.btn_pass,
+                enabled = canPass && isPlayTurn,
                 modifier = Modifier
-                    .width(80.dp)
-                    .height(44.dp),
-                shape = RoundedCornerShape(22.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = ButtonSecondary,
-                    contentColor = TextWhite
-                ),
-                enabled = canPass && isPlayTurn
-            ) {
-                Text(
-                    text = "不出",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
+                    .width(92.dp)
+                    .height(36.dp),
+                contentDescription = "不出"
+            )
             
-            // 出牌按钮
-            Button(
+            PokerImageButton(
                 onClick = onPlayClick,
+                normalRes = R.drawable.discard,
+                enabled = canPlay && isPlayTurn,
                 modifier = Modifier
-                    .width(80.dp)
-                    .height(44.dp),
-                shape = RoundedCornerShape(22.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Gold500,
-                    contentColor = CardBlack
-                ),
-                enabled = canPlay && isPlayTurn
-            ) {
-                Text(
-                    text = "出牌",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+                    .width(92.dp)
+                    .height(36.dp),
+                contentDescription = "出牌"
+            )
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.happy.poker.core.ai
 
 import com.happy.poker.core.model.*
+import com.happy.poker.core.rules.Validator
 
 /**
  * AI评估器
@@ -98,9 +99,9 @@ object AiEvaluator {
         val strength = evaluateHandStrength(hand)
 
         return when {
-            strength >= 70 -> 3
-            strength >= 50 -> minOf(2, currentBid + 1)
-            strength >= 30 -> minOf(1, currentBid + 1)
+            strength >= 70 && currentBid < 3 -> 3
+            strength >= 50 && currentBid < 2 -> maxOf(2, currentBid + 1)
+            strength >= 30 && currentBid < 1 -> 1
             else -> 0
         }
     }
@@ -200,7 +201,7 @@ object AiEvaluator {
 
         // 顺子（优先出长顺子）
         analysis.straights.sortedByDescending { it.ranks.size }.forEach { pattern ->
-            val cards = convertRanksToCards(hand, pattern.ranks)
+            val cards = convertPatternToCards(hand, pattern)
             if (cards.isNotEmpty()) {
                 val value = evaluatePlayValue(cards, pattern.pattern, hand, isLandlord, landlordHandSize)
                 candidates.add(Pair(cards, value))
@@ -209,7 +210,7 @@ object AiEvaluator {
 
         // 连对
         analysis.consecutivePairs.sortedByDescending { it.ranks.size }.forEach { pattern ->
-            val cards = convertRanksToCards(hand, pattern.ranks)
+            val cards = convertPatternToCards(hand, pattern)
             if (cards.isNotEmpty()) {
                 val value = evaluatePlayValue(cards, pattern.pattern, hand, isLandlord, landlordHandSize)
                 candidates.add(Pair(cards, value))
@@ -218,7 +219,7 @@ object AiEvaluator {
 
         // 飞机
         analysis.planes.sortedByDescending { it.ranks.size }.forEach { pattern ->
-            val cards = convertRanksToCards(hand, pattern.ranks)
+            val cards = convertPatternToCards(hand, pattern)
             if (cards.isNotEmpty()) {
                 val value = evaluatePlayValue(cards, pattern.pattern, hand, isLandlord, landlordHandSize)
                 candidates.add(Pair(cards, value))
@@ -227,7 +228,7 @@ object AiEvaluator {
 
         // 三带
         analysis.tripleWithPairs.sortedByDescending { it.ranks.first().value }.forEach { pattern ->
-            val cards = convertRanksToCards(hand, pattern.ranks)
+            val cards = convertPatternToCards(hand, pattern)
             if (cards.isNotEmpty()) {
                 val value = evaluatePlayValue(cards, pattern.pattern, hand, isLandlord, landlordHandSize)
                 candidates.add(Pair(cards, value))
@@ -235,7 +236,7 @@ object AiEvaluator {
         }
 
         analysis.tripleWithOnes.sortedByDescending { it.ranks.first().value }.forEach { pattern ->
-            val cards = convertRanksToCards(hand, pattern.ranks)
+            val cards = convertPatternToCards(hand, pattern)
             if (cards.isNotEmpty()) {
                 val value = evaluatePlayValue(cards, pattern.pattern, hand, isLandlord, landlordHandSize)
                 candidates.add(Pair(cards, value))
@@ -244,7 +245,7 @@ object AiEvaluator {
 
         // 对子（优先出小对子）
         analysis.pairs.sortedBy { it.ranks.first().value }.forEach { pattern ->
-            val cards = convertRanksToCards(hand, pattern.ranks)
+            val cards = convertPatternToCards(hand, pattern)
             if (cards.isNotEmpty()) {
                 val value = evaluatePlayValue(cards, pattern.pattern, hand, isLandlord, landlordHandSize)
                 candidates.add(Pair(cards, value))
@@ -253,7 +254,7 @@ object AiEvaluator {
 
         // 单张（优先出小单张）
         analysis.singles.sortedBy { it.ranks.first().value }.forEach { pattern ->
-            val cards = convertRanksToCards(hand, pattern.ranks)
+            val cards = convertPatternToCards(hand, pattern)
             if (cards.isNotEmpty()) {
                 val value = evaluatePlayValue(cards, pattern.pattern, hand, isLandlord, landlordHandSize)
                 candidates.add(Pair(cards, value))
@@ -261,7 +262,10 @@ object AiEvaluator {
         }
 
         // 选择价值最高的出牌
-        return candidates.maxByOrNull { it.second }?.first
+        return candidates
+            .filter { (cards, _) -> Validator.validatePlay(cards, null).isValid }
+            .maxByOrNull { it.second }
+            ?.first
     }
 
     private fun suggestFollowPlay(
@@ -276,15 +280,19 @@ object AiEvaluator {
         if (validPlays.isEmpty()) return null
 
         // 选择价值最高的出牌
-        return validPlays.maxByOrNull { pattern ->
-            evaluatePlayValue(
-                convertRanksToCards(hand, pattern.ranks),
-                pattern.pattern,
-                hand,
-                isLandlord,
-                landlordHandSize
-            )
-        }?.let { convertRanksToCards(hand, it.ranks) }
+        return validPlays
+            .mapNotNull { pattern ->
+                val cards = convertPatternToCards(hand, pattern)
+                if (cards.isNotEmpty() && Validator.validatePlay(cards, lastPattern).isValid) {
+                    Pair(cards, pattern.pattern)
+                } else {
+                    null
+                }
+            }
+            .maxByOrNull { (cards, pattern) ->
+                evaluatePlayValue(cards, pattern, hand, isLandlord, landlordHandSize)
+            }
+            ?.first
     }
 
     private fun findValidPlays(
@@ -327,7 +335,7 @@ object AiEvaluator {
             PatternType.ConsecutivePairs -> {
                 validPlays.addAll(
                     analysis.consecutivePairs.filter {
-                        it.ranks.size == lastPattern.cardCount &&
+                        it.pattern.cardCount == lastPattern.cardCount &&
                         it.ranks.first().value > lastPattern.mainRank.value
                     }
                 )
@@ -335,7 +343,8 @@ object AiEvaluator {
             PatternType.Plane, PatternType.PlaneWithWings -> {
                 validPlays.addAll(
                     analysis.planes.filter {
-                        it.ranks.size == lastPattern.groupCount &&
+                        it.pattern.groupCount == lastPattern.groupCount &&
+                        it.pattern.cardCount == lastPattern.cardCount &&
                         it.ranks.first().value > lastPattern.mainRank.value
                     }
                 )
@@ -367,6 +376,33 @@ object AiEvaluator {
                     counts[rank] == count
                 }
             }
+        }
+    }
+
+    private fun convertPatternToCards(hand: List<Card>, pattern: CardPattern): List<Card> {
+        return when (pattern.pattern.type) {
+            PatternType.ConsecutivePairs -> {
+                val expandedRanks = pattern.ranks.distinct().flatMap { rank -> listOf(rank, rank) }
+                convertRanksToCards(hand, expandedRanks)
+            }
+            PatternType.Plane -> {
+                val expandedRanks = pattern.ranks.distinct().flatMap { rank -> List(3) { rank } }
+                convertRanksToCards(hand, expandedRanks)
+            }
+            PatternType.PlaneWithWings -> {
+                val coreRanks = pattern.ranks.distinct().flatMap { rank -> List(3) { rank } }
+                val coreCards = convertRanksToCards(hand, coreRanks)
+                if (coreCards.size != coreRanks.size) return coreCards
+
+                val remainingCards = hand.toMutableList()
+                coreCards.forEach { remainingCards.remove(it) }
+                val kickers = remainingCards
+                    .sortedByGameOrder()
+                    .take(pattern.pattern.kickerCount)
+
+                coreCards + kickers
+            }
+            else -> convertRanksToCards(hand, pattern.ranks)
         }
     }
 

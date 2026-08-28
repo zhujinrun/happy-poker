@@ -116,8 +116,9 @@ object Play {
         // 增加过牌计数
         room.passCount++
         
-        // 如果连续两人过牌，轮到最后出牌的人
-        if (room.passCount >= 2) {
+        // 除最后出牌者外，其他玩家都过牌后，轮到最后出牌者重新领出
+        val passesNeededToReset = (room.playerCount - 1).coerceAtLeast(1)
+        if (room.passCount >= passesNeededToReset) {
             val lastPlayer = room.findPlayer(room.lastPlayedPlayerId!!)
             if (lastPlayer != null) {
                 room.currentPlayerIndex = room.getPlayerIndex(lastPlayer.id)

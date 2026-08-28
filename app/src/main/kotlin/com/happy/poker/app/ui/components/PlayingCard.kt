@@ -1,6 +1,7 @@
 package com.happy.poker.app.ui.components
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,7 +15,9 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.happy.poker.app.R
 import com.happy.poker.app.ui.theme.*
 import com.happy.poker.core.model.Card as GameCard
@@ -26,8 +29,8 @@ import com.happy.poker.core.model.Suit
  */
 fun getCardDrawableId(card: GameCard): Int {
     // 王牌特殊处理
-    if (card.rank == Rank.SmallJoker) return R.drawable.card_bj
-    if (card.rank == Rank.BigJoker) return R.drawable.card_lj
+    if (card.rank == Rank.SmallJoker) return R.drawable.card_lj
+    if (card.rank == Rank.BigJoker) return R.drawable.card_bj
     
     // 普通牌
     val rankChar = when (card.rank) {
@@ -121,7 +124,10 @@ fun PlayingCard(
     isSelected: Boolean = false,
     isFaceDown: Boolean = false,
     onClick: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    cardWidth: Dp = 60.dp,
+    cardHeight: Dp = 90.dp,
+    selectedLift: Dp = 20.dp
 ) {
     // 选中动画
     val transition = updateTransition(targetState = isSelected, label = "cardSelect")
@@ -133,7 +139,7 @@ fun PlayingCard(
             )
         },
         label = "offsetY"
-    ) { if (it) -20f else 0f }
+    ) { if (it) -selectedLift.value else 0f }
     
     val scale by transition.animateFloat(
         transitionSpec = {
@@ -147,8 +153,8 @@ fun PlayingCard(
     
     Card(
         modifier = modifier
-            .width(60.dp)
-            .height(90.dp)
+            .width(cardWidth)
+            .height(cardHeight)
             .scale(scale)
             .offset(y = offsetY.dp)
             .clickable(onClick = onClick),
@@ -158,11 +164,12 @@ fun PlayingCard(
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = if (isSelected) 8.dp else 4.dp
-        )
+        ),
+        border = if (isSelected) BorderStroke(2.dp, Gold500) else null
     ) {
         if (isFaceDown) {
             Image(
-                painter = painterResource(id = R.drawable.card_back),
+                painter = painterResource(id = R.drawable.card_back_new),
                 contentDescription = "牌背",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
@@ -183,18 +190,48 @@ fun HandCards(
     cards: List<GameCard>,
     selectedCards: Set<String> = emptySet(),
     onCardClick: (GameCard) -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    cardWidth: Dp = 60.dp,
+    cardHeight: Dp = 90.dp,
+    containerHeight: Dp = 118.dp,
+    minStep: Dp = 18.dp,
+    maxStep: Dp = 38.dp,
+    selectedLift: Dp = 20.dp
 ) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy((-40).dp)
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(containerHeight),
+        contentAlignment = androidx.compose.ui.Alignment.BottomCenter
     ) {
-        cards.forEach { card ->
-            PlayingCard(
-                card = card,
-                isSelected = card.id in selectedCards,
-                onClick = { onCardClick(card) }
-            )
+        val step = if (cards.size <= 1) {
+            0.dp
+        } else {
+            val availableStep = ((maxWidth - cardWidth).value / (cards.size - 1)).dp
+            availableStep.coerceIn(minStep, maxStep)
+        }
+        val handWidth = if (cards.isEmpty()) 0.dp else cardWidth + (step.value * (cards.size - 1)).dp
+
+        Box(
+            modifier = Modifier
+                .width(handWidth)
+                .height(containerHeight)
+        ) {
+            cards.forEachIndexed { index, card ->
+                PlayingCard(
+                    card = card,
+                    isSelected = card.id in selectedCards,
+                    onClick = { onCardClick(card) },
+                    modifier = Modifier
+                        .offset(x = (step.value * index).dp)
+                        .width(cardWidth)
+                        .height(cardHeight)
+                        .zIndex(index.toFloat()),
+                    cardWidth = cardWidth,
+                    cardHeight = cardHeight,
+                    selectedLift = selectedLift
+                )
+            }
         }
     }
 }
@@ -208,6 +245,32 @@ fun CardBack(
         isFaceDown = true,
         modifier = modifier
     )
+}
+
+@Composable
+fun SmallPlayingCard(
+    card: GameCard,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .width(40.dp)
+            .height(56.dp),
+        shape = RoundedCornerShape(4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 2.dp
+        )
+    ) {
+        Image(
+            painter = painterResource(id = getCardDrawableId(card)),
+            contentDescription = card.displayName,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+    }
 }
 
 @Composable

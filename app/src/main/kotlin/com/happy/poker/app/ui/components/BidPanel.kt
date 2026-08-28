@@ -4,11 +4,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.happy.poker.app.R
 import com.happy.poker.app.ui.theme.*
 
 @Composable
@@ -23,103 +24,64 @@ fun BidPanel(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 标题
         Text(
-            text = "叫地主",
+            text = if (currentBid > 0) "有人叫分，是否抢地主" else "轮到你叫地主",
             color = TextWhite,
-            fontSize = 18.sp,
+            fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 12.dp)
+            modifier = Modifier.padding(bottom = 8.dp)
         )
         
-        // 叫分按钮
         Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // 不叫按钮
-            Button(
+            PokerImageButton(
+                normalRes = R.drawable.btn_no_bid,
                 onClick = onPassClick,
+                enabled = enabled,
                 modifier = Modifier
-                    .width(70.dp)
-                    .height(40.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = ButtonSecondary,
-                    contentColor = TextWhite
-                ),
-                enabled = enabled
-            ) {
-                Text(
-                    text = "不叫",
+                    .width(92.dp)
+                    .height(36.dp),
+                contentDescription = "不叫"
+            )
+            
+            if (currentBid < 1) {
+                PokerImageButton(
+                    text = "1分",
+                    onClick = { onBidClick(1) },
+                    normalRes = R.drawable.btn_green,
+                    enabled = enabled,
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
+                    modifier = Modifier
+                        .width(68.dp)
+                        .height(34.dp)
                 )
             }
             
-            // 1分按钮
-            if (currentBid < 1) {
-                Button(
-                    onClick = { onBidClick(1) },
-                    modifier = Modifier
-                        .width(70.dp)
-                        .height(40.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Gold500,
-                        contentColor = CardBlack
-                    ),
-                    enabled = enabled
-                ) {
-                    Text(
-                        text = "1分",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-            
-            // 2分按钮
             if (currentBid < 2) {
-                Button(
+                PokerImageButton(
+                    text = "2分",
                     onClick = { onBidClick(2) },
+                    normalRes = R.drawable.btn_orange,
+                    enabled = enabled,
+                    fontSize = 14.sp,
                     modifier = Modifier
-                        .width(70.dp)
-                        .height(40.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Gold500,
-                        contentColor = CardBlack
-                    ),
-                    enabled = enabled
-                ) {
-                    Text(
-                        text = "2分",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                        .width(68.dp)
+                        .height(34.dp)
+                )
             }
             
-            // 3分按钮
             if (currentBid < 3) {
-                Button(
+                PokerImageButton(
                     onClick = { onBidClick(3) },
+                    normalRes = if (currentBid > 0) R.drawable.text_grab else R.drawable.btn_bid,
+                    enabled = enabled,
                     modifier = Modifier
-                        .width(70.dp)
-                        .height(40.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = ButtonDanger,
-                        contentColor = TextWhite
-                    ),
-                    enabled = enabled
-                ) {
-                    Text(
-                        text = "3分",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                        .width(92.dp)
+                        .height(36.dp),
+                    contentDescription = if (currentBid > 0) "抢地主" else "叫地主"
+                )
             }
         }
     }

@@ -295,9 +295,14 @@ class GameFlow(
             roomId = room.id,
             state = room.state,
             players = room.players.map { it.toPlayerState() },
-            currentPlayerId = room.currentPlayer?.id,
+            currentPlayerId = if (room.state == RoomState.Bidding) {
+                room.currentBidder
+            } else {
+                room.currentPlayer?.id
+            },
             landlordId = room.landlordId,
             multiplier = room.multiplier,
+            lastPlayedPattern = room.lastPlayedPattern,
             lastPlayedCards = room.lastPlayedCards,
             lastPlayedPlayerId = room.lastPlayedPlayerId,
             bottomCards = currentDeal?.bottomCards ?: emptyList()
@@ -315,6 +320,7 @@ data class GameState(
     val currentPlayerId: String?,
     val landlordId: String?,
     val multiplier: Int,
+    val lastPlayedPattern: HandPattern?,
     val lastPlayedCards: List<Card>?,
     val lastPlayedPlayerId: String?,
     val bottomCards: List<Card>

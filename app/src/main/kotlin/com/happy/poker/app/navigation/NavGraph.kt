@@ -39,6 +39,7 @@ fun NavGraph(
         composable(Screen.Home.route) {
             HomeScreen(
                 onSinglePlayerClick = {
+                    gameViewModel.startGame()
                     navController.navigate(Screen.Game.route)
                 },
                 onMultiplayerClick = {
@@ -106,6 +107,7 @@ fun NavGraph(
                     }
                 },
                 onPlayAgainClick = {
+                    gameViewModel.startGame()
                     navController.navigate(Screen.Game.route) {
                         popUpTo(Screen.Game.route) {
                             inclusive = true

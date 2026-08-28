@@ -4,6 +4,7 @@ import com.happy.poker.core.flow.GameCallback
 import com.happy.poker.core.flow.GameFlow
 import com.happy.poker.core.model.*
 import com.happy.poker.core.rules.Deal
+import com.happy.poker.core.rules.Play
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -112,6 +113,19 @@ class GameFlowTest {
     }
 
     @Test
+    fun testStateUsesCurrentBidderDuringBidding() {
+        gameFlow.startGame()
+        val firstBidder = room.currentBidder!!
+
+        assertEquals(firstBidder, gameFlow.getState().currentPlayerId)
+
+        gameFlow.playerBid(firstBidder, 0)
+        val secondBidder = room.currentBidder!!
+
+        assertEquals(secondBidder, gameFlow.getState().currentPlayerId)
+    }
+
+    @Test
     fun testCannotBidLower() {
         gameFlow.startGame()
         val firstBidder = room.currentBidder!!
@@ -147,6 +161,39 @@ class GameFlowTest {
         gameFlow.playerPass(firstBidder)
 
         assertEquals("你必须出牌", callback.lastError)
+    }
+
+    @Test
+    fun testTwoPlayerPassResetsToLastPlayer() {
+        val leader = Player(id = "player1", name = "玩家1")
+        val follower = Player(id = "player2", name = "玩家2")
+        leader.addCards(
+            listOf(
+                Card(Rank.Three, Suit.Spades),
+                Card(Rank.Five, Suit.Spades)
+            )
+        )
+        follower.addCards(
+            listOf(
+                Card(Rank.Four, Suit.Hearts),
+                Card(Rank.Six, Suit.Hearts)
+            )
+        )
+
+        val twoPlayerRoom = Room(id = "two-player", name = "二人房", hostId = leader.id).apply {
+            addPlayer(leader)
+            addPlayer(follower)
+            state = RoomState.Playing
+            currentPlayerIndex = 0
+        }
+
+        assertTrue(Play.playCards(leader, listOf(Card(Rank.Three, Suit.Spades)), twoPlayerRoom).success)
+        assertEquals(follower.id, twoPlayerRoom.currentPlayer?.id)
+
+        assertTrue(Play.pass(follower, twoPlayerRoom).success)
+        assertEquals(leader.id, twoPlayerRoom.currentPlayer?.id)
+        assertNull(twoPlayerRoom.lastPlayedPattern)
+        assertNull(twoPlayerRoom.lastPlayedCards)
     }
 
     @Test

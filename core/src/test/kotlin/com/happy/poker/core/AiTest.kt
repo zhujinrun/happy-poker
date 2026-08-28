@@ -2,15 +2,53 @@ package com.happy.poker.core
 
 import com.happy.poker.core.ai.AiManager
 import com.happy.poker.core.ai.AiPlayer
+import com.happy.poker.core.ai.AiEvaluator
 import com.happy.poker.core.ai.PatternAnalyzer
 import com.happy.poker.core.ai.SimpleStrategy
+import com.happy.poker.core.ai.Strategy
+import com.happy.poker.core.flow.GameCallback
+import com.happy.poker.core.flow.GameFlow
 import com.happy.poker.core.model.*
+import com.happy.poker.core.rules.Validator
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 class AiTest {
     private lateinit var strategy: SimpleStrategy
+
+    private class RecordingCallback : GameCallback {
+        var lastError = ""
+        var lastBid: Int? = null
+        var lastPlayPlayerId: String? = null
+        var lastPlayWasPass = false
+
+        override fun onGameStart(players: List<Player>, bottomCards: List<Card>) {}
+        override fun onDealCards(playerId: String, cards: List<Card>) {}
+        override fun onBidStart(firstBidderId: String) {}
+        override fun onPlayerBid(playerId: String, playerName: String, bid: Int, isPass: Boolean) {
+            lastBid = bid
+        }
+        override fun onLandlordDecided(landlordId: String, bottomCards: List<Card>, multiplier: Int) {}
+        override fun onPlayStart(landlordId: String, firstPlayerId: String) {}
+
+        override fun onPlayerPlay(
+            playerId: String,
+            playerName: String,
+            cards: List<Card>,
+            pattern: HandPattern,
+            isPass: Boolean
+        ) {
+            lastPlayPlayerId = playerId
+            lastPlayWasPass = isPass
+        }
+
+        override fun onMultiplierChanged(multiplier: Int, bombCount: Int) {}
+        override fun onSpring(landlordId: String, isLandlordWin: Boolean) {}
+        override fun onGameEnd(winnerId: String, winnerRole: PlayerRole, scores: Map<String, Int>, multiplier: Int) {}
+        override fun onError(message: String) { lastError = message }
+        override fun onPlayerStatusChanged(playerId: String, isOnline: Boolean, isReady: Boolean) {}
+    }
 
     @BeforeEach
     fun setup() {
@@ -78,6 +116,172 @@ class AiTest {
 
         assertTrue(analysis.straights.isNotEmpty())
         assertEquals(PatternType.Straight, analysis.straights.first().pattern.type)
+    }
+
+    @Test
+    fun testAiEvaluatorDoesNotReturnInvalidConsecutivePairPlay() {
+        val hand = listOf(
+            Card(Rank.Three, Suit.Spades),
+            Card(Rank.Three, Suit.Hearts),
+            Card(Rank.Four, Suit.Diamonds),
+            Card(Rank.Four, Suit.Clubs),
+            Card(Rank.Five, Suit.Spades),
+            Card(Rank.Five, Suit.Hearts),
+            Card(Rank.Seven, Suit.Diamonds)
+        )
+
+        val cards = AiEvaluator.suggestBestPlay(hand, null, isLandlord = false, landlordHandSize = 17)
+
+        assertNotNull(cards)
+        assertTrue(Validator.validatePlay(cards!!, null).isValid)
+    }
+
+    @Test
+    fun testAiEvaluatorDoesNotReturnInvalidPlanePlay() {
+        val hand = listOf(
+            Card(Rank.Three, Suit.Spades),
+            Card(Rank.Three, Suit.Hearts),
+            Card(Rank.Three, Suit.Diamonds),
+            Card(Rank.Four, Suit.Spades),
+            Card(Rank.Four, Suit.Hearts),
+            Card(Rank.Four, Suit.Diamonds),
+            Card(Rank.Eight, Suit.Clubs),
+            Card(Rank.Nine, Suit.Spades)
+        )
+
+        val cards = AiEvaluator.suggestBestPlay(hand, null, isLandlord = false, landlordHandSize = 17)
+
+        assertNotNull(cards)
+        assertTrue(Validator.validatePlay(cards!!, null).isValid)
+    }
+
+    @Test
+    fun testAiAutoPlayFallsBackToSingleWhenLeadingWithNoSuggestion() {
+        val ai = Player(id = "ai_1", name = "电脑1", isAI = true)
+        val next = Player(id = "player_2", name = "玩家2")
+        val other = Player(id = "player_3", name = "玩家3")
+        ai.addCards(
+            listOf(
+                Card(Rank.Three, Suit.Spades),
+                Card(Rank.Five, Suit.Hearts)
+            )
+        )
+
+        val room = Room(id = "room", name = "测试房间", hostId = ai.id).apply {
+            addPlayer(ai)
+            addPlayer(next)
+            addPlayer(other)
+            state = RoomState.Playing
+            landlordId = ai.id
+            currentPlayerIndex = 0
+            currentBid = 1
+        }
+        ai.role = PlayerRole.Landlord
+        next.role = PlayerRole.Farmer
+        other.role = PlayerRole.Farmer
+
+        val callback = RecordingCallback()
+        val flow = GameFlow(room, callback)
+        val noSuggestionStrategy = object : Strategy {
+            override fun decideBid(hand: List<Card>, currentBid: Int, playerCount: Int) = 0
+            override fun decidePlay(
+                hand: List<Card>,
+                lastPattern: HandPattern?,
+                isLandlord: Boolean,
+                landlordHandSize: Int
+            ): List<Card>? = null
+        }
+
+        val success = AiPlayer(ai, noSuggestionStrategy).autoPlay(flow, null, isLandlord = true, landlordHandSize = ai.handSize)
+
+        assertTrue(success)
+        assertEquals("", callback.lastError)
+        assertEquals("ai_1", callback.lastPlayPlayerId)
+        assertFalse(callback.lastPlayWasPass)
+        assertEquals(1, ai.handSize)
+    }
+
+    @Test
+    fun testAiAutoPlayPassesWhenFollowSuggestionIsInvalid() {
+        val ai = Player(id = "ai_1", name = "电脑1", isAI = true)
+        val lastPlayer = Player(id = "player_2", name = "玩家2")
+        val other = Player(id = "player_3", name = "玩家3")
+        ai.addCards(
+            listOf(
+                Card(Rank.Three, Suit.Spades),
+                Card(Rank.Four, Suit.Hearts)
+            )
+        )
+
+        val room = Room(id = "room", name = "测试房间", hostId = lastPlayer.id).apply {
+            addPlayer(ai)
+            addPlayer(lastPlayer)
+            addPlayer(other)
+            state = RoomState.Playing
+            landlordId = lastPlayer.id
+            currentPlayerIndex = 0
+            currentBid = 1
+            lastPlayedPattern = HandPattern.single(Rank.BigJoker)
+            lastPlayedCards = listOf(Card(Rank.BigJoker, Suit.Joker))
+            lastPlayedPlayerId = lastPlayer.id
+        }
+        ai.role = PlayerRole.Farmer
+        lastPlayer.role = PlayerRole.Landlord
+        other.role = PlayerRole.Farmer
+
+        val callback = RecordingCallback()
+        val flow = GameFlow(room, callback)
+        val invalidSuggestionStrategy = object : Strategy {
+            override fun decideBid(hand: List<Card>, currentBid: Int, playerCount: Int) = 0
+            override fun decidePlay(
+                hand: List<Card>,
+                lastPattern: HandPattern?,
+                isLandlord: Boolean,
+                landlordHandSize: Int
+            ): List<Card>? = hand
+        }
+
+        val success = AiPlayer(ai, invalidSuggestionStrategy)
+            .autoPlay(flow, room.lastPlayedPattern, isLandlord = false, landlordHandSize = lastPlayer.handSize)
+
+        assertTrue(success)
+        assertEquals("", callback.lastError)
+        assertEquals("ai_1", callback.lastPlayPlayerId)
+        assertTrue(callback.lastPlayWasPass)
+        assertEquals(2, ai.handSize)
+    }
+
+    @Test
+    fun testAiAutoBidPassesWhenSuggestionCannotBeatCurrentBid() {
+        val ai = Player(id = "ai_1", name = "电脑1", isAI = true)
+        val next = Player(id = "player_2", name = "玩家2")
+        val other = Player(id = "player_3", name = "玩家3")
+        val room = Room(id = "room", name = "测试房间", hostId = ai.id).apply {
+            addPlayer(ai)
+            addPlayer(next)
+            addPlayer(other)
+            state = RoomState.Bidding
+            currentBid = 2
+            currentBidder = ai.id
+        }
+        val callback = RecordingCallback()
+        val flow = GameFlow(room, callback)
+        val lowBidStrategy = object : Strategy {
+            override fun decideBid(hand: List<Card>, currentBid: Int, playerCount: Int) = 1
+            override fun decidePlay(
+                hand: List<Card>,
+                lastPattern: HandPattern?,
+                isLandlord: Boolean,
+                landlordHandSize: Int
+            ): List<Card>? = null
+        }
+
+        val success = AiPlayer(ai, lowBidStrategy).autoBid(flow, currentBid = 2)
+
+        assertTrue(success)
+        assertEquals("", callback.lastError)
+        assertEquals(0, callback.lastBid)
+        assertEquals(next.id, room.currentBidder)
     }
 
     @Test
