@@ -1,0 +1,144 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  Android:
+    name: Android
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out git repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Env
+        uses: ./.github/actions/setup
+
+      - name: Decode release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_STORE_FILE_BASE64 }}
+          KEYSTORE_FILE: ${{ secrets.KEYSTORE_STORE_FILE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_FILE:-}" ]; then
+            echo "::error::缺少 Secret: KEYSTORE_STORE_FILE"
+            echo "请在 GitHub 仓库 Settings → Secrets and variables → Actions 中配置"
+            echo "获取方式: your.keystore"
+            exit 1
+          fi
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
+            echo "::error::缺少 Secret: KEYSTORE_STORE_FILE_BASE64"
+            echo "请在 GitHub 仓库 Settings → Secrets and variables → Actions 中配置"
+            echo "获取方式: base64 -w 0 your.keystore"
+            exit 1
+          fi
+          # 兼容单行/多行 base64
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '\r\n' | base64 -d > "app/${KEYSTORE_FILE}"
+          if [ ! -s "app/${KEYSTORE_FILE}" ]; then
+            echo "::error::keystore 解码结果为空，请检查 KEYSTORE_STORE_FILE_BASE64"
+            echo "请在 GitHub 仓库 Settings → Secrets and variables → Actions 中配置"
+            echo "获取方式: base64 -w 0 your.keystore"
+            exit 1
+          fi
+          echo "Keystore 文件已解码:"
+          ls -la "app/${KEYSTORE_FILE}"
+
+      - name: Build Packages
+        env:
+          KEYSTORE_FILE: ${{ secrets.KEYSTORE_STORE_FILE }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEYSTORE_KEY_ALIAS: ${{ secrets.KEYSTORE_KEY_ALIAS }}
+          KEYSTORE_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
+        run: |
+          if [ -z "${KEYSTORE_FILE:-}" ] || [ -z "${KEYSTORE_PASSWORD:-}" ] || [ -z "${KEYSTORE_KEY_ALIAS:-}" ] || [ -z "${KEYSTORE_KEY_PASSWORD:-}" ]; then
+            echo "缺少签名 Secrets: KEYSTORE_STORE_FILE / KEYSTORE_PASSWORD / KEYSTORE_KEY_ALIAS / KEYSTORE_KEY_PASSWORD"
+            exit 1
+          fi
+          trap 'rm -f "app/${KEYSTORE_FILE}"' EXIT
+          chmod +x ./gradlew
+          ./gradlew --no-daemon --max-workers=2 --stacktrace assembleRelease
+
+      - name: Upload JVM crash log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-jvm-crash-log
+          path: hs_err_pid*.log
+          if-no-files-found: ignore
+
+      - name: Get app version
+        run: |
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Create git tag
+        uses: pkgdeps/git-tag-action@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_repo: ${{ github.repository }}
+          version: ${{ env.APP_VERSION }}
+          git_commit_sha: ${{ github.sha }}
+          git_tag_prefix: 'v'
+
+      - name: Generate file MD5
+        run: |
+          cd app/build/outputs/apk/release
+          md5sum *.apk
+
+      - name: Upload Artifact
+        uses: ./.github/actions/upload-artifact
+        with:
+          version: ${{ env.APP_VERSION }}
+
+  Release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [Android]
+    permissions:
+      contents: write
+    steps:
+      - name: Check out git repository
+        uses: actions/checkout@v5
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: ./artifacts
+          merge-multiple: true
+
+      - name: Get package version
+        run: |
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Rename APK
+        run: |
+          mv artifacts/app-release.apk "artifacts/happy-poker-v${{ env.APP_VERSION }}.apk"
+
+      - name: Generate file MD5
+        run: |
+          echo -e '\n### File MD5\n```' >> ./publish/changeLog.md
+          cd artifacts
+          md5sum *.apk >> ../publish/changeLog.md
+          echo -e '```\n' >> ../publish/changeLog.md
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: ./publish/changeLog.md
+          prerelease: false
+          draft: false
+          tag_name: v${{ env.APP_VERSION }}
+          files: |
+            artifacts/happy-poker-v${{ env.APP_VERSION }}.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

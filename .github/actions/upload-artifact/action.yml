@@ -1,0 +1,16 @@
+name: Upload APK artifacts
+description: Upload release APKs
+
+inputs:
+  version:
+    description: 'App version'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: happy-poker-v${{ inputs.version }}
+        path: app/build/outputs/apk/release/app-release.apk

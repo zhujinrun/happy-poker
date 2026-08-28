@@ -1,0 +1,12 @@
+name: Setup
+description: Setup Java Environment
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Java Env
+      uses: actions/setup-java@v5
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+        cache: gradle

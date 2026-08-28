@@ -5,7 +5,15 @@ plugins {
 
 import java.util.Properties
 
-// 读取 keystore 配置文件
+// CI 环境：从环境变量读取签名配置
+val ciStoreFile = System.getenv("KEYSTORE_FILE") ?: ""
+val ciStorePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
+val ciKeyAlias = System.getenv("KEYSTORE_KEY_ALIAS") ?: ""
+val ciKeyPassword = System.getenv("KEYSTORE_KEY_PASSWORD") ?: ""
+
+val hasCiSigning = ciStoreFile.isNotEmpty() && ciStorePassword.isNotEmpty() && ciKeyAlias.isNotEmpty() && ciKeyPassword.isNotEmpty()
+
+// 本地环境：从 keystore.properties 读取签名配置
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties()
 if (keystorePropertiesFile.exists()) {
@@ -28,10 +36,19 @@ android {
     signingConfigs {
         getByName("debug")
         create("release") {
-            storeFile = file(keystoreProperties.getProperty("storeFile", "release.keystore"))
-            storePassword = keystoreProperties.getProperty("storePassword", "")
-            keyAlias = keystoreProperties.getProperty("keyAlias", "")
-            keyPassword = keystoreProperties.getProperty("keyPassword", "")
+            if (hasCiSigning) {
+                // CI 环境：使用解码后的 keystore 文件
+                storeFile = file(ciStoreFile)
+                storePassword = ciStorePassword
+                keyAlias = ciKeyAlias
+                keyPassword = ciKeyPassword
+            } else if (keystorePropertiesFile.exists()) {
+                // 本地环境：使用 keystore.properties 文件
+                storeFile = file(keystoreProperties.getProperty("storeFile", "release.keystore"))
+                storePassword = keystoreProperties.getProperty("storePassword", "")
+                keyAlias = keystoreProperties.getProperty("keyAlias", "")
+                keyPassword = keystoreProperties.getProperty("keyPassword", "")
+            }
         }
     }
 
