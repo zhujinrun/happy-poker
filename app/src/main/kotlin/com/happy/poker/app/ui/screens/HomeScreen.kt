@@ -138,7 +138,7 @@ fun HomeScreen(
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = TextWhite
                 ),
-                border = ButtonDefaults.outlinedButtonBorder.copy(
+                border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
                     brush = Brush.horizontalGradient(
                         colors = listOf(TextWhite, Gold500)
                     )
