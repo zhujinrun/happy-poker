@@ -2,6 +2,8 @@ package com.happy.poker.app.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.happy.poker.app.network.ConnectionState
+import com.happy.poker.app.network.ReconnectManager
 import com.happy.poker.core.model.*
 import com.happy.poker.core.network.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,7 +35,8 @@ data class MultiplayerGameUiState(
     val gameResult: GameResult? = null,
     val errorMessage: String? = null,
     val isConnected: Boolean = false,
-    val isSearching: Boolean = false
+    val isSearching: Boolean = false,
+    val connectionState: ConnectionState = ConnectionState.DISCONNECTED
 )
 
 class MultiplayerGameViewModel : ViewModel() {
@@ -43,19 +46,48 @@ class MultiplayerGameViewModel : ViewModel() {
     private val mqttClient = GameMqttClient()
     private val humanPlayerId: String = "human_player_${System.currentTimeMillis()}"
     private var currentRoomId: String = ""
+    private val reconnectManager = ReconnectManager()
 
     init {
+        reconnectManager.init(viewModelScope) { reconnect() }
         connectToBroker()
     }
 
     private fun connectToBroker() {
         viewModelScope.launch {
             try {
+                updateUiState { it.copy(connectionState = ConnectionState.CONNECTING) }
                 mqttClient.connect()
-                updateUiState { it.copy(isConnected = true) }
+                reconnectManager.onConnected()
+                updateUiState { it.copy(isConnected = true, connectionState = ConnectionState.CONNECTED) }
                 setupMessageHandlers()
             } catch (e: Exception) {
-                updateUiState { it.copy(errorMessage = "连接服务器失败: ${e.message}") }
+                reconnectManager.onError(e)
+                updateUiState { 
+                    it.copy(
+                        errorMessage = "连接服务器失败: ${e.message}",
+                        connectionState = ConnectionState.ERROR
+                    ) 
+                }
+            }
+        }
+    }
+
+    private fun reconnect() {
+        viewModelScope.launch {
+            try {
+                updateUiState { it.copy(connectionState = ConnectionState.RECONNECTING) }
+                mqttClient.connect()
+                reconnectManager.onConnected()
+                updateUiState { it.copy(isConnected = true, connectionState = ConnectionState.CONNECTED) }
+                setupMessageHandlers()
+            } catch (e: Exception) {
+                reconnectManager.onError(e)
+                updateUiState { 
+                    it.copy(
+                        connectionState = ConnectionState.ERROR
+                    ) 
+                }
             }
         }
     }
