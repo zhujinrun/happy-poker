@@ -7,12 +7,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.happy.poker.app.ui.screens.*
 import com.happy.poker.app.viewmodel.GameViewModel
+import com.happy.poker.app.viewmodel.MultiplayerGameViewModel
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
     object RoomList : Screen("room_list")
     object CreateRoom : Screen("create_room")
     object Game : Screen("game")
+    object MultiplayerGame : Screen("multiplayer_game")
     object Result : Screen("result")
 }
 
@@ -20,7 +22,8 @@ sealed class Screen(val route: String) {
 fun NavGraph(
     navController: NavHostController,
     startDestination: String = Screen.Home.route,
-    gameViewModel: GameViewModel = viewModel()
+    gameViewModel: GameViewModel = viewModel(),
+    multiplayerViewModel: MultiplayerGameViewModel = viewModel()
 ) {
     NavHost(
         navController = navController,
@@ -46,7 +49,8 @@ fun NavGraph(
                     navController.popBackStack()
                 },
                 onRoomClick = { room ->
-                    navController.navigate(Screen.Game.route)
+                    multiplayerViewModel.joinRoom(room.id)
+                    navController.navigate(Screen.MultiplayerGame.route)
                 },
                 onCreateRoomClick = {
                     navController.navigate(Screen.CreateRoom.route)
@@ -60,8 +64,8 @@ fun NavGraph(
                     navController.popBackStack()
                 },
                 onCreateClick = { name, maxPlayers ->
-                    // TODO: 创建房间并导航到游戏
-                    navController.navigate(Screen.Game.route)
+                    multiplayerViewModel.createRoom(name, maxPlayers)
+                    navController.navigate(Screen.MultiplayerGame.route)
                 }
             )
         }
@@ -70,6 +74,16 @@ fun NavGraph(
             GameScreen(
                 viewModel = gameViewModel,
                 onBackClick = {
+                    navController.popBackStack()
+                }
+            )
+        }
+        
+        composable(Screen.MultiplayerGame.route) {
+            MultiplayerGameScreen(
+                viewModel = multiplayerViewModel,
+                onBackClick = {
+                    multiplayerViewModel.leaveRoom()
                     navController.popBackStack()
                 }
             )
