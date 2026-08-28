@@ -12,15 +12,7 @@ class AdvancedStrategy : Strategy {
     private val farmerStrategy = FarmerStrategy()
 
     override fun decideBid(hand: List<Card>, currentBid: Int, playerCount: Int): Int {
-        val analysis = PatternAnalyzer.analyzeHand(hand)
-        val score = evaluateHandForBid(hand, analysis)
-
-        return when {
-            score >= 10 -> 3
-            score >= 7 -> minOf(2, currentBid + 1)
-            score >= 4 -> minOf(1, currentBid + 1)
-            else -> 0
-        }
+        return AiEvaluator.suggestBid(hand, currentBid)
     }
 
     override fun decidePlay(
@@ -29,29 +21,7 @@ class AdvancedStrategy : Strategy {
         isLandlord: Boolean,
         landlordHandSize: Int
     ): List<Card>? {
-        return if (isLandlord) {
-            landlordStrategy.decidePlay(hand, lastPattern, landlordHandSize)
-        } else {
-            farmerStrategy.decidePlay(hand, lastPattern, landlordHandSize)
-        }
-    }
-
-    private fun evaluateHandForBid(hand: List<Card>, analysis: HandAnalysis): Int {
-        var score = 0
-        val hasSmallJoker = hand.any { it.rank == Rank.SmallJoker }
-        val hasBigJoker = hand.any { it.rank == Rank.BigJoker }
-        if (hasSmallJoker && hasBigJoker) score += 5
-        else if (hasBigJoker) score += 3
-        else if (hasSmallJoker) score += 2
-        val twoCount = hand.count { it.rank == Rank.Two }
-        score += twoCount * 2
-        score += analysis.bombs.size * 3
-        if (analysis.rocket != null) score += 4
-        score += analysis.triples.size
-        score += analysis.straights.size
-        score += analysis.consecutivePairs.size
-        score += analysis.planes.size
-        return score
+        return AiEvaluator.suggestBestPlay(hand, lastPattern, isLandlord, landlordHandSize)
     }
 }
 
