@@ -1,5 +1,6 @@
 package com.happy.poker.app.ui.components
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -7,7 +8,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -33,10 +36,34 @@ fun PlayingCard(
 ) {
     val textMeasurer = rememberTextMeasurer()
     
+    // 选中动画
+    val transition = updateTransition(targetState = isSelected, label = "cardSelect")
+    val offsetY by transition.animateFloat(
+        transitionSpec = {
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            )
+        },
+        label = "offsetY"
+    ) { if (it) -20f else 0f }
+    
+    val scale by transition.animateFloat(
+        transitionSpec = {
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            )
+        },
+        label = "scale"
+    ) { if (it) 1.1f else 1f }
+    
     Card(
         modifier = modifier
             .width(60.dp)
             .height(90.dp)
+            .scale(scale)
+            .offset(y = offsetY.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(6.dp),
         colors = CardDefaults.cardColors(
