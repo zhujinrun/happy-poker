@@ -2,11 +2,15 @@ package com.happy.poker.app.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.happy.poker.core.ai.AiManager
+import com.happy.poker.core.ai.AiPlayer
 import com.happy.poker.core.flow.GameCallback
 import com.happy.poker.core.flow.GameFlow
 import com.happy.poker.core.flow.GameState
 import com.happy.poker.core.model.*
 import com.happy.poker.core.rules.Validator
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -51,6 +55,7 @@ class GameViewModel : ViewModel() {
     private var room: Room? = null
     private var gameFlow: GameFlow? = null
     private val humanPlayerId: String = "human_player"
+    private val aiManager = AiManager()
 
     init {
         initializeGame()
@@ -74,6 +79,10 @@ class GameViewModel : ViewModel() {
 
         room = newRoom
         gameFlow = GameFlow(newRoom, createGameCallback())
+
+        // 创建AI玩家
+        aiManager.createAiPlayer(aiPlayer1)
+        aiManager.createAiPlayer(aiPlayer2)
 
         updateUiState {
             it.copy(
@@ -163,6 +172,37 @@ class GameViewModel : ViewModel() {
         _uiState.value = update(_uiState.value)
     }
 
+    private fun handleAiBidTurn(playerId: String) {
+        val aiPlayer = aiManager.getAiPlayer(playerId) ?: return
+        val currentBid = _uiState.value.currentBid
+        val gameState = gameFlow?.getState() ?: return
+
+        viewModelScope.launch(Dispatchers.Default) {
+            val bid = aiPlayer.decideBid(gameFlow!!, currentBid)
+            gameFlow?.playerBid(playerId, bid)
+        }
+    }
+
+    private fun handleAiPlayTurn(playerId: String) {
+        val aiPlayer = aiManager.getAiPlayer(playerId) ?: return
+        val gameState = gameFlow?.getState() ?: return
+        val room = room ?: return
+
+        val isLandlord = gameState.landlordId == playerId
+        val landlordHandSize = if (isLandlord) {
+            room.findPlayer(playerId)?.handSize ?: 0
+        } else {
+            room.landlord?.handSize ?: 0
+        }
+
+        viewModelScope.launch(Dispatchers.Default) {
+            aiPlayer.autoPlay(gameFlow!!, gameState.lastPlayedCards?.let {
+                val result = Validator.identify(it)
+                if (result.isValid) result.pattern else null
+            }, isLandlord, landlordHandSize)
+        }
+    }
+
     private fun syncGameState(gameState: GameState) {
         updateUiState { state ->
             state.copy(
@@ -220,10 +260,17 @@ class GameViewModel : ViewModel() {
                 val newBid = if (bid > 0 && bid > state.currentBid) bid else state.currentBid
                 updateUiState { it.copy(currentBid = newBid, isBidTurn = false) }
 
-                // 如果不是人类玩家的回合，检查是否轮到人类
-                if (playerId != humanPlayerId) {
-                    val gameState = gameFlow?.getState()
-                    if (gameState != null && gameState.currentPlayerId == humanPlayerId) {
+                // 检查下一个是否是AI玩家
+                val gameState = gameFlow?.getState()
+                if (gameState != null) {
+                    val nextPlayerId = gameState.currentPlayerId
+                    if (nextPlayerId != null && nextPlayerId != humanPlayerId) {
+                        // 下一个是AI玩家，延迟后自动叫地主
+                        viewModelScope.launch {
+                            delay(1000) // 延迟1秒
+                            handleAiBidTurn(nextPlayerId)
+                        }
+                    } else if (nextPlayerId == humanPlayerId) {
                         updateUiState { it.copy(isBidTurn = true) }
                     }
                 }
@@ -253,6 +300,14 @@ class GameViewModel : ViewModel() {
                         currentPlayerId = firstPlayerId,
                         playerCards = humanPlayer?.hand?.toList() ?: it.playerCards
                     )
+                }
+
+                // 如果第一个出牌的是AI玩家，延迟后自动出牌
+                if (!isMyTurn) {
+                    viewModelScope.launch {
+                        delay(1000) // 延迟1秒
+                        handleAiPlayTurn(firstPlayerId)
+                    }
                 }
             }
 
@@ -287,9 +342,19 @@ class GameViewModel : ViewModel() {
                     }
                 }
 
-                // 检查是否轮到人类玩家出牌
-                if (gameState?.currentPlayerId == humanPlayerId && gameState.state == RoomState.Playing) {
-                    updateUiState { it.copy(isPlayTurn = true) }
+                // 检查下一个玩家
+                val nextGameState = gameFlow?.getState()
+                if (nextGameState != null && nextGameState.state == RoomState.Playing) {
+                    val nextPlayerId = nextGameState.currentPlayerId
+                    if (nextPlayerId != null && nextPlayerId != humanPlayerId) {
+                        // 下一个是AI玩家，延迟后自动出牌
+                        viewModelScope.launch {
+                            delay(1000) // 延迟1秒
+                            handleAiPlayTurn(nextPlayerId)
+                        }
+                    } else if (nextPlayerId == humanPlayerId) {
+                        updateUiState { it.copy(isPlayTurn = true) }
+                    }
                 }
             }
 
