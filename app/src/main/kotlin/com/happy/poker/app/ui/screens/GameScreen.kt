@@ -15,6 +15,7 @@ import com.happy.poker.app.ui.components.*
 import com.happy.poker.app.ui.theme.*
 import com.happy.poker.app.viewmodel.GameViewModel
 import com.happy.poker.app.viewmodel.PlayerUiState
+import com.happy.poker.app.effects.SpecialEffectOverlay
 import com.happy.poker.core.model.Card as GameCard
 import com.happy.poker.core.model.PlayerRole
 import com.happy.poker.core.model.Rank
@@ -26,6 +27,7 @@ fun GameScreen(
     onBackClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val specialEffectState by viewModel.specialEffectState.collectAsState()
     
     // 显示错误信息
     uiState.errorMessage?.let { message ->
@@ -35,23 +37,31 @@ fun GameScreen(
         }
     }
     
-    GameScreenContent(
-        playerCards = uiState.playerCards,
-        selectedCards = uiState.selectedCards,
-        onCardClick = { viewModel.selectCard(it.id) },
-        onPlayClick = { viewModel.playCards() },
-        onPassClick = { viewModel.pass() },
-        onHintClick = { /* TODO: 提示功能 */ },
-        onBidClick = { viewModel.bid(it) },
-        onBidPassClick = { viewModel.bidPass() },
-        isPlayTurn = uiState.isPlayTurn,
-        isBidTurn = uiState.isBidTurn,
-        currentBid = uiState.currentBid,
-        multiplier = uiState.multiplier,
-        players = uiState.players,
-        currentPlayerId = uiState.currentPlayerId,
-        onBackClick = onBackClick
-    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        GameScreenContent(
+            playerCards = uiState.playerCards,
+            selectedCards = uiState.selectedCards,
+            onCardClick = { viewModel.selectCard(it.id) },
+            onPlayClick = { viewModel.playCards() },
+            onPassClick = { viewModel.pass() },
+            onHintClick = { /* TODO: 提示功能 */ },
+            onBidClick = { viewModel.bid(it) },
+            onBidPassClick = { viewModel.bidPass() },
+            isPlayTurn = uiState.isPlayTurn,
+            isBidTurn = uiState.isBidTurn,
+            currentBid = uiState.currentBid,
+            multiplier = uiState.multiplier,
+            players = uiState.players,
+            currentPlayerId = uiState.currentPlayerId,
+            onBackClick = onBackClick
+        )
+        
+        // 特效覆盖层
+        SpecialEffectOverlay(
+            effectState = specialEffectState,
+            onEffectComplete = { viewModel.stopSpecialEffect() }
+        )
+    }
 }
 
 @Composable

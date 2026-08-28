@@ -9,7 +9,7 @@ import com.happy.poker.core.model.*
  */
 class AiPlayer(
     val player: Player,
-    private val strategy: Strategy = SimpleStrategy()
+    private val strategy: Strategy = AdvancedStrategy()
 ) {
     /**
      * 决定是否叫地主
@@ -68,7 +68,7 @@ class AiManager {
     /**
      * 创建AI玩家
      */
-    fun createAiPlayer(player: Player, strategy: Strategy = SimpleStrategy()): AiPlayer {
+    fun createAiPlayer(player: Player, strategy: Strategy = AdvancedStrategy()): AiPlayer {
         val aiPlayer = AiPlayer(player, strategy)
         aiPlayers[player.id] = aiPlayer
         return aiPlayer

@@ -9,6 +9,9 @@ import com.happy.poker.core.flow.GameFlow
 import com.happy.poker.core.flow.GameState
 import com.happy.poker.core.model.*
 import com.happy.poker.core.rules.Validator
+import com.happy.poker.app.effects.SpecialEffectsManager
+import com.happy.poker.app.effects.SpecialEffectState
+import com.happy.poker.app.effects.SpecialEffectType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,9 +59,17 @@ class GameViewModel : ViewModel() {
     private var gameFlow: GameFlow? = null
     private val humanPlayerId: String = "human_player"
     private val aiManager = AiManager()
+    private val specialEffectsManager = SpecialEffectsManager()
+    private val _specialEffectState = MutableStateFlow(SpecialEffectState(SpecialEffectType.Bomb))
+    val specialEffectState: StateFlow<SpecialEffectState> = _specialEffectState.asStateFlow()
 
     init {
         initializeGame()
+    }
+
+    private fun updateSpecialEffectState() {
+        val currentState = specialEffectsManager.effectState.value
+        _specialEffectState.value = currentState
     }
 
     private fun initializeGame() {
@@ -166,6 +177,10 @@ class GameViewModel : ViewModel() {
 
     fun clearError() {
         updateUiState { it.copy(errorMessage = null) }
+    }
+
+    fun stopSpecialEffect() {
+        specialEffectsManager.stopEffect()
     }
 
     private fun updateUiState(update: (GameUiState) -> GameUiState) {
@@ -360,10 +375,21 @@ class GameViewModel : ViewModel() {
 
             override fun onMultiplierChanged(multiplier: Int, bombCount: Int) {
                 updateUiState { it.copy(multiplier = multiplier) }
+                // 触发炸弹特效
+                if (bombCount > 0) {
+                    when {
+                        bombCount == 1 -> specialEffectsManager.triggerBombEffect(multiplier, bombCount)
+                        bombCount == 2 -> specialEffectsManager.triggerDoubleBombEffect(multiplier)
+                        else -> specialEffectsManager.triggerMultiBombEffect(multiplier, bombCount)
+                    }
+                    updateSpecialEffectState()
+                }
             }
 
             override fun onSpring(landlordId: String, isLandlordWin: Boolean) {
-                // 春天事件
+                // 春天事件 - 触发春天特效
+                specialEffectsManager.triggerSpringEffect(_uiState.value.multiplier)
+                updateSpecialEffectState()
             }
 
             override fun onGameEnd(

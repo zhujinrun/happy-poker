@@ -15,6 +15,8 @@ import com.happy.poker.app.ui.components.*
 import com.happy.poker.app.ui.theme.*
 import com.happy.poker.app.viewmodel.MultiplayerGameViewModel
 import com.happy.poker.app.viewmodel.PlayerUiState
+import com.happy.poker.app.effects.SpecialEffectOverlay
+import com.happy.poker.app.effects.SpecialEffectsManager
 import com.happy.poker.core.model.Card as GameCard
 import com.happy.poker.core.model.PlayerRole
 import com.happy.poker.core.model.RoomState
@@ -25,6 +27,8 @@ fun MultiplayerGameScreen(
     onBackClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val specialEffectsManager = remember { SpecialEffectsManager() }
+    val specialEffectState by specialEffectsManager.effectState.collectAsState()
     
     // 显示错误信息
     uiState.errorMessage?.let { message ->
@@ -34,55 +38,70 @@ fun MultiplayerGameScreen(
         }
     }
     
-    when (uiState.room.state) {
-        RoomState.Waiting -> WaitingRoomContent(
-            room = uiState.room,
-            isHost = uiState.room.isHost,
-            onReadyClick = { viewModel.setReady(true) },
-            onStartClick = { viewModel.startGame() },
-            onBackClick = onBackClick
-        )
-        RoomState.Bidding, RoomState.Playing -> GameContent(
-            playerCards = uiState.playerCards,
-            selectedCards = uiState.selectedCards,
-            onCardClick = { viewModel.selectCard(it.id) },
-            onPlayClick = { viewModel.playCards() },
-            onPassClick = { viewModel.pass() },
-            onBidClick = { viewModel.bid(it) },
-            onBidPassClick = { viewModel.bidPass() },
-            isPlayTurn = uiState.isPlayTurn,
-            isBidTurn = uiState.isBidTurn,
-            currentBid = uiState.currentBid,
-            multiplier = uiState.multiplier,
-            players = uiState.room.players,
-            onBackClick = onBackClick
-        )
-        RoomState.Finished -> {
-            uiState.gameResult?.let { result ->
-                ResultScreen(
-                    winner = when (result.winnerRole) {
-                        PlayerRole.Landlord -> "地主"
-                        PlayerRole.Farmer -> "农民"
-                        else -> "未知"
-                    },
-                    players = uiState.room.players.map { player ->
-                        com.happy.poker.app.ui.screens.PlayerResult(
-                            name = player.name,
-                            role = when (player.role) {
-                                PlayerRole.Landlord -> "地主"
-                                PlayerRole.Farmer -> "农民"
-                                else -> "未知"
-                            },
-                            score = result.scores[player.id] ?: 0,
-                            isWinner = player.id == result.winnerId
-                        )
-                    },
-                    multiplier = result.multiplier,
-                    onBackToHomeClick = onBackClick,
-                    onPlayAgainClick = { /* TODO: 再来一局 */ }
-                )
+    // 监听倍数变化以触发特效
+    LaunchedEffect(uiState.multiplier) {
+        if (uiState.multiplier > 1) {
+            specialEffectsManager.triggerBombEffect(uiState.multiplier, 1)
+        }
+    }
+    
+    Box(modifier = Modifier.fillMaxSize()) {
+        when (uiState.room.state) {
+            RoomState.Waiting -> WaitingRoomContent(
+                room = uiState.room,
+                isHost = uiState.room.isHost,
+                onReadyClick = { viewModel.setReady(true) },
+                onStartClick = { viewModel.startGame() },
+                onBackClick = onBackClick
+            )
+            RoomState.Bidding, RoomState.Playing -> GameContent(
+                playerCards = uiState.playerCards,
+                selectedCards = uiState.selectedCards,
+                onCardClick = { viewModel.selectCard(it.id) },
+                onPlayClick = { viewModel.playCards() },
+                onPassClick = { viewModel.pass() },
+                onBidClick = { viewModel.bid(it) },
+                onBidPassClick = { viewModel.bidPass() },
+                isPlayTurn = uiState.isPlayTurn,
+                isBidTurn = uiState.isBidTurn,
+                currentBid = uiState.currentBid,
+                multiplier = uiState.multiplier,
+                players = uiState.room.players,
+                onBackClick = onBackClick
+            )
+            RoomState.Finished -> {
+                uiState.gameResult?.let { result ->
+                    ResultScreen(
+                        winner = when (result.winnerRole) {
+                            PlayerRole.Landlord -> "地主"
+                            PlayerRole.Farmer -> "农民"
+                            else -> "未知"
+                        },
+                        players = uiState.room.players.map { player ->
+                            com.happy.poker.app.ui.screens.PlayerResult(
+                                name = player.name,
+                                role = when (player.role) {
+                                    PlayerRole.Landlord -> "地主"
+                                    PlayerRole.Farmer -> "农民"
+                                    else -> "未知"
+                                },
+                                score = result.scores[player.id] ?: 0,
+                                isWinner = player.id == result.winnerId
+                            )
+                        },
+                        multiplier = result.multiplier,
+                        onBackToHomeClick = onBackClick,
+                        onPlayAgainClick = { /* TODO: 再来一局 */ }
+                    )
+                }
             }
         }
+        
+        // 特效覆盖层
+        SpecialEffectOverlay(
+            effectState = specialEffectState,
+            onEffectComplete = { specialEffectsManager.stopEffect() }
+        )
     }
 }
 
