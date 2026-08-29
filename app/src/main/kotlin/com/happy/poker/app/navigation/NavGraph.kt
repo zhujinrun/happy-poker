@@ -57,7 +57,7 @@ fun NavGraph(
                     navController.popBackStack()
                 },
                 onRoomClick = { room ->
-                    multiplayerViewModel.joinRoom(room.id)
+                    multiplayerViewModel.joinRoom(room.id, room.maxPlayers)
                     navController.navigate(Screen.MultiplayerGame.route)
                 },
                 onCreateRoomClick = {

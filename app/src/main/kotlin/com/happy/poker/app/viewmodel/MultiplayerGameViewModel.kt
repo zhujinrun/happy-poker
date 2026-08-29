@@ -10,10 +10,19 @@ import com.happy.poker.core.ai.AiEvaluator
 import com.happy.poker.core.model.*
 import com.happy.poker.core.network.*
 import com.happy.poker.core.rules.Validator
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+
+private const val TURN_TIMEOUT_SECONDS = 30
+
+private enum class MultiplayerTurnPhase {
+    Bidding,
+    Playing
+}
 
 data class RoomUiState(
     val roomId: String = "",
@@ -34,8 +43,11 @@ data class MultiplayerGameUiState(
     val isPlayTurn: Boolean = false,
     val isBidTurn: Boolean = false,
     val currentBid: Int = 0,
+    val currentPlayerId: String? = null,
     val lastPlayedCards: List<Card>? = null,
     val lastPlayedPattern: HandPattern? = null,
+    val lastPlayedBy: String? = null,
+    val turnSecondsRemaining: Int = TURN_TIMEOUT_SECONDS,
     val gameResult: GameResult? = null,
     val errorMessage: String? = null,
     val feedbackMessage: String? = null,
@@ -52,8 +64,11 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     private val mqttClient = GameMqttClient()
     private val humanPlayerId: String = "human_player_${System.currentTimeMillis()}"
     private var currentRoomId: String = ""
+    private var currentRoomMaxPlayers: Int = 3
     private val reconnectManager = ReconnectManager()
     private val mqttConfigManager = MqttConfigManager(application)
+    private var turnTimerJob: Job? = null
+    private var turnTimerToken: Int = 0
 
     init {
         reconnectManager.init(viewModelScope) { reconnect() }
@@ -118,6 +133,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
 
     fun createRoom(roomName: String, maxPlayers: Int) {
         viewModelScope.launch {
+            currentRoomMaxPlayers = maxPlayers
             updateUiState { it.copy(isSearching = true) }
             val message = RoomCreateMessage(
                 playerName = "我",
@@ -128,8 +144,9 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
-    fun joinRoom(roomId: String) {
+    fun joinRoom(roomId: String, maxPlayers: Int = 3) {
         viewModelScope.launch {
+            currentRoomMaxPlayers = maxPlayers
             updateUiState { it.copy(isSearching = true) }
             val message = RoomJoinMessage(
                 roomId = roomId,
@@ -142,12 +159,14 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
 
     fun leaveRoom() {
         viewModelScope.launch {
+            stopHumanTurnTimer()
             val message = RoomLeaveMessage(
                 roomId = currentRoomId,
                 playerId = humanPlayerId
             )
             mqttClient.sendMessage(Protocol.TOPIC_ROOM_LEAVE, message)
             currentRoomId = ""
+            currentRoomMaxPlayers = 3
             updateUiState { MultiplayerGameUiState() }
         }
     }
@@ -328,10 +347,23 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                     players = listOf(
                         PlayerUiState(humanPlayerId, "我", PlayerRole.Unknown, 0, true)
                     ),
-                    maxPlayers = 3,
+                    maxPlayers = currentRoomMaxPlayers,
+                    state = RoomState.Waiting,
                     isHost = true,
                     hostId = humanPlayerId
                 ),
+                currentPlayerId = null,
+                currentBid = 0,
+                lastPlayedCards = null,
+                lastPlayedPattern = null,
+                lastPlayedBy = null,
+                selectedCards = emptySet(),
+                isPlayTurn = false,
+                isBidTurn = false,
+                bottomCards = emptyList(),
+                multiplier = 1,
+                gameResult = null,
+                turnSecondsRemaining = TURN_TIMEOUT_SECONDS,
                 isSearching = false
             )
         }
@@ -340,84 +372,160 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     private fun handleRoomJoined(message: RoomJoinedMessage) {
         currentRoomId = message.roomId
         updateUiState {
+            val existingPlayersById = it.room.players.associateBy { player -> player.id }
             it.copy(
                 room = it.room.copy(
                     roomId = message.roomId,
+                    maxPlayers = currentRoomMaxPlayers,
                     players = message.players.map { p ->
+                        val existing = existingPlayersById[p.id]
                         PlayerUiState(
                             id = p.id,
                             name = p.name,
-                            role = PlayerRole.Unknown,
-                            handSize = 0,
+                            role = existing?.role ?: PlayerRole.Unknown,
+                            handSize = existing?.handSize ?: 0,
                             isOnline = p.isOnline
                         )
                     }
                 ),
+                currentPlayerId = null,
+                currentBid = 0,
+                lastPlayedCards = null,
+                lastPlayedPattern = null,
+                lastPlayedBy = null,
+                selectedCards = emptySet(),
+                isPlayTurn = false,
+                isBidTurn = false,
+                bottomCards = emptyList(),
+                multiplier = 1,
+                gameResult = null,
+                turnSecondsRemaining = TURN_TIMEOUT_SECONDS,
                 isSearching = false
             )
         }
     }
 
     private fun handleRoomState(message: RoomStateMessage) {
+        currentRoomId = message.roomId
         updateUiState {
+            val existingPlayersById = it.room.players.associateBy { player -> player.id }
+            val isHost = message.hostId == humanPlayerId
             it.copy(
                 room = RoomUiState(
                     roomId = message.roomId,
                     roomName = message.roomName,
+                    maxPlayers = currentRoomMaxPlayers,
                     players = message.players.map { p ->
+                        val existing = existingPlayersById[p.id]
                         PlayerUiState(
                             id = p.id,
                             name = p.name,
-                            role = PlayerRole.Unknown,
-                            handSize = 0,
+                            role = existing?.role ?: PlayerRole.Unknown,
+                            handSize = existing?.handSize ?: 0,
                             isOnline = p.isOnline
                         )
                     },
                     state = message.state,
+                    isHost = isHost,
                     hostId = message.hostId
-                )
+                ),
+                currentPlayerId = if (message.state == RoomState.Waiting) null else it.currentPlayerId,
+                currentBid = if (message.state == RoomState.Waiting) 0 else it.currentBid,
+                lastPlayedCards = if (message.state == RoomState.Waiting) null else it.lastPlayedCards,
+                lastPlayedPattern = if (message.state == RoomState.Waiting) null else it.lastPlayedPattern,
+                lastPlayedBy = if (message.state == RoomState.Waiting) null else it.lastPlayedBy,
+                selectedCards = if (message.state == RoomState.Waiting) emptySet() else it.selectedCards,
+                isPlayTurn = if (message.state == RoomState.Waiting) false else it.isPlayTurn,
+                isBidTurn = if (message.state == RoomState.Waiting) false else it.isBidTurn,
+                gameResult = if (message.state == RoomState.Waiting) null else it.gameResult,
+                turnSecondsRemaining = if (message.state == RoomState.Waiting) TURN_TIMEOUT_SECONDS else it.turnSecondsRemaining
             )
         }
     }
 
     private fun handleGameStarted(message: GameStartMessage) {
+        currentRoomId = message.roomId
+        stopHumanTurnTimer()
         updateUiState {
             it.copy(
                 bottomCards = message.bottomCards.map { it.toCard() },
-                room = it.room.copy(state = RoomState.Playing)
+                room = it.room.copy(state = RoomState.Bidding),
+                currentPlayerId = null,
+                currentBid = 0,
+                lastPlayedCards = null,
+                lastPlayedPattern = null,
+                lastPlayedBy = null,
+                selectedCards = emptySet(),
+                isPlayTurn = false,
+                isBidTurn = false,
+                gameResult = null,
+                turnSecondsRemaining = TURN_TIMEOUT_SECONDS
             )
         }
     }
 
     private fun handleBidResult(message: GameBidResultMessage) {
+        currentRoomId = message.roomId
+        val nextBidderId = message.nextBidderId
         updateUiState {
             it.copy(
                 currentBid = message.currentBid,
-                isBidTurn = false
+                currentPlayerId = nextBidderId,
+                isBidTurn = nextBidderId == humanPlayerId,
+                isPlayTurn = false,
+                room = it.room.copy(state = RoomState.Bidding),
+                turnSecondsRemaining = if (nextBidderId == humanPlayerId) TURN_TIMEOUT_SECONDS else it.turnSecondsRemaining
             )
+        }
+        if (nextBidderId == humanPlayerId) {
+            startHumanTurnTimer(MultiplayerTurnPhase.Bidding)
+        } else {
+            stopHumanTurnTimer()
         }
     }
 
     private fun handlePlayResult(message: GamePlayResultMessage) {
+        currentRoomId = message.roomId
         val cards = message.cards.map { it.toCard() }
+        val nextPlayerId = message.nextPlayerId
         updateUiState {
             it.copy(
                 lastPlayedCards = if (!message.isPass) cards else it.lastPlayedCards,
                 lastPlayedPattern = if (!message.isPass) message.pattern.toHandPattern() else it.lastPlayedPattern,
-                isPlayTurn = false,
-                selectedCards = emptySet()
+                lastPlayedBy = if (!message.isPass) message.playerId else it.lastPlayedBy,
+                currentPlayerId = nextPlayerId,
+                isPlayTurn = nextPlayerId == humanPlayerId,
+                isBidTurn = false,
+                room = it.room.copy(state = RoomState.Playing),
+                selectedCards = emptySet(),
+                turnSecondsRemaining = if (nextPlayerId == humanPlayerId) TURN_TIMEOUT_SECONDS else it.turnSecondsRemaining
             )
+        }
+        if (nextPlayerId == humanPlayerId) {
+            startHumanTurnTimer(MultiplayerTurnPhase.Playing)
+        } else {
+            stopHumanTurnTimer()
         }
     }
 
     private fun handleGameStateUpdate(message: GameStateMessage) {
-        val myState = message.players.find { it.id == humanPlayerId }
+        currentRoomId = message.roomId
+        val lastPlayedCards = message.lastPlayedCards?.map { it.toCard() }
         updateUiState {
+            val nextCurrentPlayerId = message.currentPlayerId
+            val isBidTurn = message.state == RoomState.Bidding && nextCurrentPlayerId == humanPlayerId
+            val isPlayTurn = message.state == RoomState.Playing && nextCurrentPlayerId == humanPlayerId
             it.copy(
                 multiplier = message.multiplier,
-                lastPlayedCards = message.lastPlayedCards?.map { it.toCard() },
+                currentPlayerId = nextCurrentPlayerId,
+                lastPlayedCards = lastPlayedCards,
+                lastPlayedPattern = if (lastPlayedCards.isNullOrEmpty()) null else Validator.identify(lastPlayedCards).pattern,
+                lastPlayedBy = message.lastPlayedPlayerId,
+                isBidTurn = isBidTurn,
+                isPlayTurn = isPlayTurn,
                 room = it.room.copy(
                     state = message.state,
+                    isHost = it.room.hostId == humanPlayerId,
                     players = message.players.map { ps ->
                         PlayerUiState(
                             id = ps.id,
@@ -427,29 +535,76 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                             isOnline = ps.isOnline
                         )
                     }
-                )
+                ),
+                turnSecondsRemaining = when {
+                    isBidTurn || isPlayTurn -> TURN_TIMEOUT_SECONDS
+                    else -> it.turnSecondsRemaining
+                }
             )
+        }
+        when {
+            message.state == RoomState.Bidding && message.currentPlayerId == humanPlayerId -> startHumanTurnTimer(MultiplayerTurnPhase.Bidding)
+            message.state == RoomState.Playing && message.currentPlayerId == humanPlayerId -> startHumanTurnTimer(MultiplayerTurnPhase.Playing)
+            else -> stopHumanTurnTimer()
         }
     }
 
     private fun handleGameEnded(message: GameEndMessage) {
+        currentRoomId = message.roomId
+        stopHumanTurnTimer()
         updateUiState {
             it.copy(
                 room = it.room.copy(state = RoomState.Finished),
                 isPlayTurn = false,
                 isBidTurn = false,
+                currentPlayerId = null,
                 gameResult = GameResult(
                     winnerId = message.winnerId,
                     winnerRole = message.winnerRole,
                     scores = message.scores,
                     multiplier = message.multiplier
-                )
+                ),
+                turnSecondsRemaining = TURN_TIMEOUT_SECONDS
             )
         }
     }
 
     private fun handleError(message: ErrorMessage) {
         showFeedback(message.message)
+    }
+
+    private fun startHumanTurnTimer(phase: MultiplayerTurnPhase) {
+        turnTimerJob?.cancel()
+        val token = ++turnTimerToken
+        updateUiState { it.copy(turnSecondsRemaining = TURN_TIMEOUT_SECONDS) }
+
+        turnTimerJob = viewModelScope.launch {
+            for (remaining in (TURN_TIMEOUT_SECONDS - 1) downTo 0) {
+                delay(1000)
+                if (token != turnTimerToken) return@launch
+
+                val state = _uiState.value
+                val stillMyTurn = when (phase) {
+                    MultiplayerTurnPhase.Bidding -> state.room.state == RoomState.Bidding && state.isBidTurn
+                    MultiplayerTurnPhase.Playing -> state.room.state == RoomState.Playing && state.isPlayTurn
+                }
+                if (!stillMyTurn) return@launch
+
+                updateUiState { it.copy(turnSecondsRemaining = remaining) }
+                if (remaining == 0) {
+                    showFeedback("倒计时结束")
+                }
+            }
+        }
+    }
+
+    private fun stopHumanTurnTimer(resetSeconds: Boolean = true) {
+        turnTimerJob?.cancel()
+        turnTimerJob = null
+        turnTimerToken += 1
+        if (resetSeconds) {
+            updateUiState { it.copy(turnSecondsRemaining = TURN_TIMEOUT_SECONDS) }
+        }
     }
 
     override fun onCleared() {

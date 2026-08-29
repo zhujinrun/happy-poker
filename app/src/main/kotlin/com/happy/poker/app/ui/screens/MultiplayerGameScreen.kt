@@ -1,17 +1,26 @@
 package com.happy.poker.app.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.happy.poker.app.R
 import com.happy.poker.app.ui.components.*
 import com.happy.poker.app.ui.theme.*
 import com.happy.poker.app.viewmodel.MultiplayerGameViewModel
@@ -84,9 +93,12 @@ fun MultiplayerGameScreen(
                 isPlayTurn = uiState.isPlayTurn,
                 isBidTurn = uiState.isBidTurn,
                 currentBid = uiState.currentBid,
+                turnSecondsRemaining = uiState.turnSecondsRemaining,
                 multiplier = uiState.multiplier,
                 bottomCards = uiState.bottomCards,
                 lastPlayedCards = uiState.lastPlayedCards,
+                currentPlayerId = uiState.currentPlayerId,
+                lastPlayedBy = uiState.lastPlayedBy,
                 players = uiState.room.players,
                 onBackClick = onBackClick
             )
@@ -145,162 +157,237 @@ fun WaitingRoomContent(
     onStartClick: () -> Unit = {},
     onBackClick: () -> Unit = {}
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        TableGradientStart,
-                        TableGradientEnd
-                    )
+    PokerScreenBackground {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val compact = maxHeight < 560.dp
+            val seatCount = room.maxPlayers.coerceAtLeast(2)
+
+            Column(modifier = Modifier.fillMaxSize()) {
+                PokerLobbyHeader(
+                    title = room.roomName,
+                    subtitle = if (isHost) "你是房主，准备好后可以开局" else "等待房主开始游戏",
+                    onBackClick = onBackClick,
+                    trailing = {
+                        PokerStatusPill(
+                            text = room.state.displayName,
+                            color = if (room.state == RoomState.Waiting) Gold500 else Green600
+                        )
+                    }
                 )
-            )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            // 房间信息
-            Text(
-                text = room.roomName,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = Gold500,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-            
-            Text(
-                text = "等待玩家加入...",
-                fontSize = 18.sp,
-                color = TextWhite,
-                modifier = Modifier.padding(bottom = 32.dp)
-            )
-            
-            // 玩家列表
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = PlayerAreaBackground
-                )
-            ) {
+
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
+                        .fillMaxSize()
+                        .weight(1f)
+                        .navigationBarsPadding()
+                        .padding(horizontal = 18.dp, vertical = if (compact) 10.dp else 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)
                 ) {
-                    room.players.forEach { player ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                    PokerGlassPanel(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Text(
-                                text = player.name,
+                                text = "入座情况",
+                                color = Gold500,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                room.players.take(seatCount).forEach { player ->
+                                    WaitingSeat(
+                                        player = player,
+                                        isHostSeat = player.id == room.hostId,
+                                        compact = compact
+                                    )
+                                }
+                                repeat((seatCount - room.players.size).coerceAtLeast(0)) {
+                                    EmptySeat(compact = compact)
+                                }
+                            }
+                        }
+                    }
+
+                    PokerGlassPanel(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.TopCenter
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = "房间信息",
                                 color = TextWhite,
-                                fontSize = 16.sp
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
                             )
-                            Text(
-                                text = if (player.id == room.players.firstOrNull()?.id) "房主" else "玩家",
-                                color = TextGray,
-                                fontSize = 14.sp
-                            )
+                            RoomMetaRow(label = "房间", value = room.roomName)
+                            RoomMetaRow(label = "人数", value = "${room.players.size}/${room.maxPlayers}")
+                            RoomMetaRow(label = "身份", value = if (isHost) "房主" else "玩家")
                         }
                     }
-                    
-                    // 显示空位
-                    repeat(room.maxPlayers - room.players.size) {
-                        Row(
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        PokerImageButton(
+                            normalRes = R.drawable.btn_blue,
+                            text = "返回",
+                            onClick = onBackClick,
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "等待加入...",
-                                color = TextGray,
-                                fontSize = 16.sp
+                                .weight(1f)
+                                .height(44.dp),
+                            fontSize = 15.sp
+                        )
+
+                        if (isHost) {
+                            PokerImageButton(
+                                normalRes = R.drawable.btn_orange,
+                                text = "开始",
+                                onClick = onStartClick,
+                                enabled = room.players.size >= 2,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp),
+                                textColor = CardBlack,
+                                fontSize = 15.sp
                             )
-                            Text(
-                                text = "空位",
-                                color = TextGray,
-                                fontSize = 14.sp
+                        } else {
+                            PokerImageButton(
+                                normalRes = R.drawable.btn_green,
+                                text = "准备",
+                                onClick = onReadyClick,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp),
+                                fontSize = 15.sp
                             )
                         }
-                    }
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            // 操作按钮
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // 返回按钮
-                OutlinedButton(
-                    onClick = onBackClick,
-                    modifier = Modifier
-                        .width(120.dp)
-                        .height(50.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = TextWhite
-                    )
-                ) {
-                    Text(
-                        text = "返回",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-                
-                if (isHost) {
-                    // 开始游戏按钮（房主）
-                    Button(
-                        onClick = onStartClick,
-                        modifier = Modifier
-                            .width(120.dp)
-                            .height(50.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Gold500,
-                            contentColor = CardBlack
-                        ),
-                        enabled = room.players.size >= 2
-                    ) {
-                        Text(
-                            text = "开始游戏",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                } else {
-                    // 准备按钮（普通玩家）
-                    Button(
-                        onClick = onReadyClick,
-                        modifier = Modifier
-                            .width(120.dp)
-                            .height(50.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Green600,
-                            contentColor = TextWhite
-                        )
-                    ) {
-                        Text(
-                            text = "准备",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun WaitingSeat(
+    player: PlayerUiState,
+    isHostSeat: Boolean,
+    compact: Boolean
+) {
+    val avatarRes = if (player.id.hashCode() % 2 == 0) R.drawable.avatar_daheng else R.drawable.avatar_luoli
+    val avatarSize = if (compact) 50.dp else 62.dp
+    val seatWidth = if (compact) 84.dp else 96.dp
+
+    Column(
+        modifier = Modifier.width(seatWidth),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(avatarSize)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.28f))
+                .border(
+                    width = if (isHostSeat) 2.dp else 1.dp,
+                    color = if (isHostSeat) Gold500 else TextWhite.copy(alpha = 0.20f),
+                    shape = CircleShape
+                ),
+            contentAlignment = Alignment.TopCenter
+        ) {
+            Image(
+                painter = painterResource(id = avatarRes),
+                contentDescription = player.name,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (compact) 90.dp else 110.dp)
+                    .offset(y = 2.dp),
+                alignment = Alignment.TopCenter,
+                contentScale = ContentScale.FillWidth
+            )
+        }
+
+        Text(
+            text = player.name,
+            color = TextWhite,
+            fontSize = if (compact) 11.sp else 12.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+        PokerStatusPill(
+            text = if (isHostSeat) "房主" else if (player.isOnline) "在线" else "离线",
+            color = if (isHostSeat) Gold500 else if (player.isOnline) Green600 else ButtonDanger
+        )
+    }
+}
+
+@Composable
+private fun EmptySeat(compact: Boolean) {
+    Column(
+        modifier = Modifier.width(if (compact) 84.dp else 96.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(if (compact) 50.dp else 62.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.20f))
+                .border(1.dp, TextWhite.copy(alpha = 0.18f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "?",
+                color = TextWhite.copy(alpha = 0.42f),
+                fontSize = if (compact) 20.sp else 24.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Text(
+            text = "等待入座",
+            color = TextGray,
+            fontSize = if (compact) 11.sp else 12.sp,
+            fontWeight = FontWeight.Medium
+        )
+        PokerStatusPill(text = "空位", color = TextGray)
+    }
+}
+
+@Composable
+private fun RoomMetaRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            color = TextWhite.copy(alpha = 0.66f),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium
+        )
+        Text(
+            text = value,
+            color = TextWhite,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -317,9 +404,12 @@ fun GameContent(
     isPlayTurn: Boolean = false,
     isBidTurn: Boolean = false,
     currentBid: Int = 0,
+    turnSecondsRemaining: Int = 30,
     multiplier: Int = 1,
     bottomCards: List<GameCard> = emptyList(),
     lastPlayedCards: List<GameCard>? = null,
+    currentPlayerId: String? = null,
+    lastPlayedBy: String? = null,
     players: List<PlayerUiState> = emptyList(),
     onBackClick: () -> Unit = {}
 ) {
@@ -335,10 +425,13 @@ fun GameContent(
         isPlayTurn = isPlayTurn,
         isBidTurn = isBidTurn,
         currentBid = currentBid,
+        turnSecondsRemaining = turnSecondsRemaining,
         multiplier = multiplier,
         bottomCards = bottomCards,
         players = players,
+        currentPlayerId = currentPlayerId,
         lastPlayedCards = lastPlayedCards,
+        lastPlayedBy = lastPlayedBy,
         onBackClick = onBackClick
     )
 }
