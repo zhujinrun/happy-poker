@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.happy.poker.app.R
+import com.happy.poker.app.sound.GameAudio
 import com.happy.poker.app.ui.components.PokerGlassPanel
 import com.happy.poker.app.ui.components.PokerImageButton
 import com.happy.poker.app.ui.components.PokerLobbyHeader
@@ -200,7 +201,10 @@ private fun RoomSizeChip(
                 color = if (selected) Gold500 else TextWhite.copy(alpha = 0.20f),
                 shape = shape
             )
-            .clickable(onClick = onClick),
+            .clickable(onClick = {
+                GameAudio.buttonClick()
+                onClick()
+            }),
         contentAlignment = Alignment.Center
     ) {
         Text(

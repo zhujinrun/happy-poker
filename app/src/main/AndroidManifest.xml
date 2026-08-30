@@ -18,6 +18,7 @@
         <activity
             android:name=".SplashActivity"
             android:exported="true"
+            android:screenOrientation="landscape"
             android:theme="@style/Theme.HappyPoker">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -28,6 +29,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="false"
+            android:screenOrientation="landscape"
             android:theme="@style/Theme.HappyPoker" />
 
         <service android:name="org.eclipse.paho.android.service.MqttService" />

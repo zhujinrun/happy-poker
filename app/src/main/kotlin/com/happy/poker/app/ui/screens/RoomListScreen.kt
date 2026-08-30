@@ -43,6 +43,7 @@ import com.happy.poker.app.ui.components.PokerImageButton
 import com.happy.poker.app.ui.components.PokerLobbyHeader
 import com.happy.poker.app.ui.components.PokerScreenBackground
 import com.happy.poker.app.ui.components.PokerStatusPill
+import com.happy.poker.app.sound.GameAudio
 import com.happy.poker.app.ui.theme.ButtonDanger
 import com.happy.poker.app.ui.theme.CardBlack
 import com.happy.poker.app.ui.theme.Gold500
@@ -200,7 +201,10 @@ fun RoomCard(
                 )
             )
             .border(1.dp, Gold500.copy(alpha = if (isWaiting) 0.46f else 0.22f), shape)
-            .clickable(enabled = isWaiting && !isFull, onClick = onClick)
+            .clickable(enabled = isWaiting && !isFull, onClick = {
+                GameAudio.buttonClick()
+                onClick()
+            })
             .padding(horizontal = if (compact) 12.dp else 16.dp, vertical = if (compact) 10.dp else 14.dp)
     ) {
         Row(

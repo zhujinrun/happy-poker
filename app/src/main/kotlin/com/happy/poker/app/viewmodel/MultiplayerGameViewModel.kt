@@ -296,15 +296,13 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
         )
 
         if (suggestion.isNullOrEmpty()) {
-            updateUiState { it.copy(selectedCards = emptySet()) }
-            showFeedback("提示：没有能压过上家的牌，可以选择不出")
+            pass()
             return
         }
 
         val validation = Validator.validatePlay(suggestion, previousPattern)
         if (!validation.isValid) {
-            updateUiState { it.copy(selectedCards = emptySet()) }
-            showFeedback("提示：暂时没有合适的出牌")
+            pass()
             return
         }
 

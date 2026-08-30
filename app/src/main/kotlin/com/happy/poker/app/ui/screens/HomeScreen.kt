@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.happy.poker.app.R
+import com.happy.poker.app.sound.GameAudio
 import com.happy.poker.app.ui.theme.*
 
 @Composable
@@ -99,7 +100,7 @@ fun HomeScreen(
                 SmallMenuButton(
                     text = "单机",
                     onClick = onSinglePlayerClick,
-                    normalRes = R.drawable.btn_blue
+                    normalRes = R.drawable.btn_orange
                 )
                 
                 SmallMenuButton(
@@ -146,7 +147,10 @@ private fun SmallMenuButton(
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = onClick
+                onClick = {
+                    GameAudio.buttonClick()
+                    onClick()
+                }
             )
     ) {
         Image(

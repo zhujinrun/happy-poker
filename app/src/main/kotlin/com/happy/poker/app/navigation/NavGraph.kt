@@ -39,7 +39,6 @@ fun NavGraph(
         composable(Screen.Home.route) {
             HomeScreen(
                 onSinglePlayerClick = {
-                    gameViewModel.startGame()
                     navController.navigate(Screen.Game.route)
                 },
                 onMultiplayerClick = {

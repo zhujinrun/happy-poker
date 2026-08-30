@@ -1,6 +1,7 @@
 package com.happy.poker.app
 
 import android.os.Bundle
+import android.content.pm.ActivityInfo
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -15,6 +16,7 @@ import com.happy.poker.app.ui.theme.HappyPokerTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         super.onCreate(savedInstanceState)
         GameAudio.init(applicationContext)
         enableEdgeToEdge()

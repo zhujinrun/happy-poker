@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.happy.poker.app.R
+import com.happy.poker.app.sound.GameAudio
 import com.happy.poker.app.ui.theme.*
 
 data class PlayerResult(
@@ -341,7 +342,7 @@ private fun ResultActions(
         SmallMenuButton(
             text = "返回主页",
             onClick = onBackToHomeClick,
-            normalRes = R.drawable.btn_blue,
+            normalRes = R.drawable.btn_green,
             width = if (compactHeight) 108 else 132,
             height = if (compactHeight) 36 else 45
         )
@@ -351,7 +352,7 @@ private fun ResultActions(
         SmallMenuButton(
             text = "再来一局",
             onClick = onPlayAgainClick,
-            normalRes = R.drawable.btn_green,
+            normalRes = R.drawable.btn_orange,
             width = if (compactHeight) 108 else 132,
             height = if (compactHeight) 36 else 45
         )
@@ -378,7 +379,10 @@ private fun SmallMenuButton(
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = onClick
+                onClick = {
+                    GameAudio.buttonClick()
+                    onClick()
+                }
             )
     ) {
         Image(

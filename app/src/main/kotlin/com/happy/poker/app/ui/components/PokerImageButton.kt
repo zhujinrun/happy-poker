@@ -19,6 +19,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
+import com.happy.poker.app.sound.GameAudio
+import com.happy.poker.app.sound.SoundType
 import com.happy.poker.app.ui.theme.TextGray
 import com.happy.poker.app.ui.theme.TextWhite
 
@@ -33,6 +35,7 @@ fun PokerImageButton(
     textColor: Color = TextWhite,
     disabledTextColor: Color = TextGray,
     fontSize: TextUnit = 16.sp,
+    soundType: SoundType? = null,
     contentDescription: String? = text
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -51,7 +54,10 @@ fun PokerImageButton(
                 interactionSource = interactionSource,
                 indication = null,
                 enabled = enabled,
-                onClick = onClick
+                onClick = {
+                    soundType?.let(GameAudio::play)
+                    onClick()
+                }
             ),
         contentAlignment = Alignment.Center
     ) {

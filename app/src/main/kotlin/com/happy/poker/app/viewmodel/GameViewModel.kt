@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 private const val TURN_TIMEOUT_SECONDS = 30
+private const val AI_PLAY_REVEAL_DELAY_MS = 1600L
 
 private enum class HumanTurnPhase {
     Bidding,
@@ -126,8 +127,6 @@ class GameViewModel : ViewModel() {
                 roomState = newRoom.state
             )
         }
-
-        startGame()
     }
 
     fun startGame() {
@@ -287,15 +286,13 @@ class GameViewModel : ViewModel() {
         )
 
         if (suggestion.isNullOrEmpty()) {
-            updateUiState { it.copy(selectedCards = emptySet()) }
-            showFeedback("提示：没有能压过上家的牌，可以选择不出")
+            pass()
             return
         }
 
         val validation = Validator.validatePlay(suggestion, previousPattern)
         if (!validation.isValid) {
-            updateUiState { it.copy(selectedCards = emptySet()) }
-            showFeedback("提示：暂时没有合适的出牌")
+            pass()
             return
         }
 
@@ -462,7 +459,7 @@ class GameViewModel : ViewModel() {
         val sessionId = gameSessionId
         aiActionJob?.cancel()
         aiActionJob = viewModelScope.launch {
-            delay(1000)
+            delay(AI_PLAY_REVEAL_DELAY_MS)
             handleAiPlayTurn(playerId, sessionId)
         }
     }

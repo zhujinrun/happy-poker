@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.happy.poker.app.sound.GameAudio
 import com.happy.poker.app.ui.theme.*
 import com.happy.poker.app.network.MqttConfigManager
 
@@ -144,7 +145,10 @@ fun SettingsScreen(
                 listOf(0, 1, 2).forEach { qosValue ->
                     FilterChip(
                         selected = qos == qosValue,
-                        onClick = { qos = qosValue },
+                        onClick = {
+                            GameAudio.buttonClick()
+                            qos = qosValue
+                        },
                         label = { Text("QoS $qosValue") },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = Gold500,
@@ -205,7 +209,10 @@ fun SettingsScreen(
                 )
                 Switch(
                     checked = autoReconnect,
-                    onCheckedChange = { autoReconnect = it },
+                    onCheckedChange = {
+                        GameAudio.buttonClick()
+                        autoReconnect = it
+                    },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = Gold500,
                         checkedTrackColor = Gold500.copy(alpha = 0.5f)
@@ -216,6 +223,7 @@ fun SettingsScreen(
             // 保存按钮
             Button(
                 onClick = {
+                    GameAudio.buttonClick()
                     mqttConfigManager.setBrokerUrl(brokerUrl)
                     mqttConfigManager.setUsername(username)
                     mqttConfigManager.setPassword(password)
@@ -247,6 +255,7 @@ fun SettingsScreen(
             // 重置按钮
             OutlinedButton(
                 onClick = {
+                    GameAudio.buttonClick()
                     mqttConfigManager.resetToDefaults()
                     brokerUrl = mqttConfigManager.getBrokerUrl()
                     username = mqttConfigManager.getUsername()
@@ -274,7 +283,10 @@ fun SettingsScreen(
 
             // 返回按钮
             OutlinedButton(
-                onClick = onBackClick,
+                onClick = {
+                    GameAudio.buttonClick()
+                    onBackClick()
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
