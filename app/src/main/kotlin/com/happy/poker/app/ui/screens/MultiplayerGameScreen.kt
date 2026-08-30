@@ -252,14 +252,14 @@ fun WaitingRoomContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        PokerImageButton(
-                            normalRes = R.drawable.btn_blue,
-                            text = "返回",
+                        PokerIconButton(
+                            iconRes = R.drawable.poker_back_arrow,
                             onClick = onBackClick,
                             modifier = Modifier
                                 .weight(1f)
                                 .height(44.dp),
-                            fontSize = 15.sp
+                            iconSize = 22.dp,
+                            contentDescription = "返回房间列表"
                         )
 
                         if (isHost) {

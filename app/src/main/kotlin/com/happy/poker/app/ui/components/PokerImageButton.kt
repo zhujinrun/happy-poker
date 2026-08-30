@@ -6,6 +6,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -17,6 +18,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
@@ -84,5 +87,45 @@ fun PokerImageButton(
                 fontWeight = FontWeight.Bold
             )
         }
+    }
+}
+
+@Composable
+fun PokerIconButton(
+    iconRes: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    iconSize: Dp = 22.dp,
+    contentDescription: String = "返回"
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val context = LocalContext.current
+
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                val pressedScale = if (isPressed) 0.92f else 1f
+                scaleX = pressedScale
+                scaleY = pressedScale
+                alpha = if (isPressed) 0.78f else 1f
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = {
+                    AppHaptics.tap(context)
+                    GameAudio.buttonClick()
+                    onClick()
+                }
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(id = iconRes),
+            contentDescription = contentDescription,
+            modifier = Modifier.size(iconSize),
+            contentScale = ContentScale.Fit
+        )
     }
 }

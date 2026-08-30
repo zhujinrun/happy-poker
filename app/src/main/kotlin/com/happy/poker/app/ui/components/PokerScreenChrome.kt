@@ -83,14 +83,14 @@ fun PokerLobbyHeader(
             .padding(horizontal = 14.dp, vertical = 0.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        PokerImageButton(
-            normalRes = R.drawable.btn_blue,
-            text = "返回",
+        PokerIconButton(
+            iconRes = R.drawable.poker_back_arrow,
             onClick = onBackClick,
             modifier = Modifier
                 .width(72.dp)
-                .height(36.dp),
-            fontSize = 14.sp
+                .height(44.dp),
+            iconSize = 22.dp,
+            contentDescription = "返回"
         )
 
         Column(

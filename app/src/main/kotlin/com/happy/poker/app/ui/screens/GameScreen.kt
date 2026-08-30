@@ -533,26 +533,14 @@ private fun PokerNavChip(
     tightLandscape: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(18.dp)
-    Box(
+    PokerIconButton(
+        iconRes = R.drawable.poker_back_arrow,
+        contentDescription = text,
         modifier = modifier
-            .height(if (tightLandscape) 30.dp else 36.dp)
-            .clip(shape)
-            .background(Color.Black.copy(alpha = 0.42f))
-            .border(1.dp, Gold500.copy(alpha = 0.55f), shape)
-            .clickable(onClick = {
-                GameAudio.buttonClick()
-                onClick()
-            }),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            color = TextWhite,
-            fontSize = if (tightLandscape) 12.sp else 14.sp,
-            fontWeight = FontWeight.Bold
-        )
-    }
+            .height(if (tightLandscape) 30.dp else 36.dp),
+        iconSize = if (tightLandscape) 18.dp else 22.dp,
+        onClick = onClick
+    )
 }
 
 @Composable
