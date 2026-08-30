@@ -10,11 +10,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import com.happy.poker.app.navigation.NavGraph
+import com.happy.poker.app.sound.GameAudio
 import com.happy.poker.app.ui.theme.HappyPokerTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        GameAudio.init(applicationContext)
         enableEdgeToEdge()
         setContent {
             HappyPokerTheme {

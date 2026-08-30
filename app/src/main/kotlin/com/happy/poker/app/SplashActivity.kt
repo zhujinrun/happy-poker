@@ -17,12 +17,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import com.happy.poker.app.sound.GameAudio
 import kotlinx.coroutines.delay
 
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        GameAudio.init(applicationContext)
         enableEdgeToEdge()
         setContent {
             SplashScreen(onTimeout = {

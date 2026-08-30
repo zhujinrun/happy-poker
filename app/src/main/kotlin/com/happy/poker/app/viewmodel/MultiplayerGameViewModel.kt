@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.happy.poker.app.network.ConnectionState
 import com.happy.poker.app.network.MqttConfigManager
 import com.happy.poker.app.network.ReconnectManager
+import com.happy.poker.app.sound.GameAudio
 import com.happy.poker.core.ai.AiEvaluator
 import com.happy.poker.core.model.*
 import com.happy.poker.core.network.*
@@ -208,6 +209,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
             currentSelected.add(cardId)
         }
         updateUiState { it.copy(selectedCards = currentSelected) }
+        GameAudio.cardSelect()
     }
 
     fun playCards() {
@@ -309,7 +311,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
         updateUiState {
             it.copy(selectedCards = suggestion.map { card -> card.id }.toSet())
         }
-        showFeedback("提示：已选中 ${suggestion.toCardText()}")
+        GameAudio.cardSelect()
     }
 
     fun refreshRoomList() {
@@ -477,6 +479,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                 turnSecondsRemaining = if (nextBidderId == humanPlayerId) TURN_TIMEOUT_SECONDS else it.turnSecondsRemaining
             )
         }
+        GameAudio.playBid(message.bid, message.isPass)
         if (nextBidderId == humanPlayerId) {
             startHumanTurnTimer(MultiplayerTurnPhase.Bidding)
         } else {
@@ -488,10 +491,11 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
         currentRoomId = message.roomId
         val cards = message.cards.map { it.toCard() }
         val nextPlayerId = message.nextPlayerId
+        val playedPattern = message.pattern.toHandPattern()
         updateUiState {
             it.copy(
                 lastPlayedCards = if (!message.isPass) cards else it.lastPlayedCards,
-                lastPlayedPattern = if (!message.isPass) message.pattern.toHandPattern() else it.lastPlayedPattern,
+                lastPlayedPattern = if (!message.isPass) playedPattern else it.lastPlayedPattern,
                 lastPlayedBy = if (!message.isPass) message.playerId else it.lastPlayedBy,
                 currentPlayerId = nextPlayerId,
                 isPlayTurn = nextPlayerId == humanPlayerId,
@@ -500,6 +504,11 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                 selectedCards = emptySet(),
                 turnSecondsRemaining = if (nextPlayerId == humanPlayerId) TURN_TIMEOUT_SECONDS else it.turnSecondsRemaining
             )
+        }
+        if (message.isPass) {
+            GameAudio.playPass()
+        } else if (!playedPattern.isBombOrRocket) {
+            GameAudio.playPattern(playedPattern, _uiState.value.multiplier)
         }
         if (nextPlayerId == humanPlayerId) {
             startHumanTurnTimer(MultiplayerTurnPhase.Playing)
@@ -511,6 +520,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     private fun handleGameStateUpdate(message: GameStateMessage) {
         currentRoomId = message.roomId
         val lastPlayedCards = message.lastPlayedCards?.map { it.toCard() }
+        val previousMultiplier = _uiState.value.multiplier
         updateUiState {
             val nextCurrentPlayerId = message.currentPlayerId
             val isBidTurn = message.state == RoomState.Bidding && nextCurrentPlayerId == humanPlayerId
@@ -542,6 +552,10 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                 }
             )
         }
+        val identifiedPattern = lastPlayedCards?.let { Validator.identify(it).pattern }
+        if (message.multiplier > previousMultiplier && identifiedPattern?.isBombOrRocket == true) {
+            GameAudio.playPattern(identifiedPattern, message.multiplier)
+        }
         when {
             message.state == RoomState.Bidding && message.currentPlayerId == humanPlayerId -> startHumanTurnTimer(MultiplayerTurnPhase.Bidding)
             message.state == RoomState.Playing && message.currentPlayerId == humanPlayerId -> startHumanTurnTimer(MultiplayerTurnPhase.Playing)
@@ -552,6 +566,12 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     private fun handleGameEnded(message: GameEndMessage) {
         currentRoomId = message.roomId
         stopHumanTurnTimer()
+        val humanSideWon = _uiState.value.room.players.find { it.id == humanPlayerId }?.role == message.winnerRole
+        if (humanSideWon) {
+            GameAudio.playWin()
+        } else {
+            GameAudio.playLose()
+        }
         updateUiState {
             it.copy(
                 room = it.room.copy(state = RoomState.Finished),

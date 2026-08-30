@@ -8,6 +8,7 @@ import com.happy.poker.core.flow.GameCallback
 import com.happy.poker.core.flow.GameFlow
 import com.happy.poker.core.flow.GameState
 import com.happy.poker.core.model.*
+import com.happy.poker.app.sound.GameAudio
 import com.happy.poker.core.rules.Validator
 import com.happy.poker.app.effects.SpecialEffectsManager
 import com.happy.poker.app.effects.SpecialEffectState
@@ -173,6 +174,7 @@ class GameViewModel : ViewModel() {
             currentSelected.add(cardId)
         }
         updateUiState { it.copy(selectedCards = currentSelected) }
+        GameAudio.cardSelect()
     }
 
     fun playCards() {
@@ -300,7 +302,7 @@ class GameViewModel : ViewModel() {
         updateUiState {
             it.copy(selectedCards = suggestion.map { card -> card.id }.toSet())
         }
-        showFeedback("提示：已选中 ${suggestion.toCardText()}")
+        GameAudio.cardSelect()
     }
 
     fun bidPass() {
@@ -630,6 +632,7 @@ class GameViewModel : ViewModel() {
                 val state = _uiState.value
                 val newBid = if (bid > 0 && bid > state.currentBid) bid else state.currentBid
                 updateUiState { it.copy(currentBid = newBid, isBidTurn = false) }
+                GameAudio.playBid(bid, isPass)
                 stopHumanTurnTimer()
             }
 
@@ -704,6 +707,12 @@ class GameViewModel : ViewModel() {
                     )
                 }
 
+                if (isPass) {
+                    GameAudio.playPass()
+                } else if (!pattern.isBombOrRocket) {
+                    GameAudio.playPattern(pattern, _uiState.value.multiplier)
+                }
+
                 // 如果是人类玩家出的牌，更新手牌并清除选中状态
                 if (playerId == humanPlayerId) {
                     val humanPlayer = room?.findPlayer(humanPlayerId)
@@ -737,6 +746,7 @@ class GameViewModel : ViewModel() {
             override fun onMultiplierChanged(multiplier: Int, bombCount: Int) {
                 updateUiState { it.copy(multiplier = multiplier) }
                 if (bombCount > 0) {
+                    _uiState.value.lastPlayedPattern?.let { GameAudio.playPattern(it, multiplier) }
                     when (_uiState.value.lastPlayedPattern?.type) {
                         PatternType.Rocket -> specialEffectsManager.triggerRocketEffect(multiplier)
                         else -> when {
@@ -753,6 +763,7 @@ class GameViewModel : ViewModel() {
                 // 春天事件 - 触发春天特效
                 specialEffectsManager.triggerSpringEffect(_uiState.value.multiplier)
                 updateSpecialEffectState()
+                GameAudio.playSpring()
             }
 
             override fun onGameEnd(
@@ -761,6 +772,12 @@ class GameViewModel : ViewModel() {
                 scores: Map<String, Int>,
                 multiplier: Int
             ) {
+                val humanSideWon = _uiState.value.players.find { it.id == humanPlayerId }?.role == winnerRole
+                if (humanSideWon) {
+                    GameAudio.playWin()
+                } else {
+                    GameAudio.playLose()
+                }
                 updateUiState {
                     it.copy(
                         roomState = RoomState.Finished,
