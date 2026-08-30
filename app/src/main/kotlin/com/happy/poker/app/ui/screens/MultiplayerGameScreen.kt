@@ -189,7 +189,7 @@ fun WaitingRoomContent(
                         .fillMaxSize()
                         .weight(1f)
                         .navigationBarsPadding()
-                        .padding(horizontal = 18.dp, vertical = if (compact) 10.dp else 18.dp),
+                        .padding(horizontal = 18.dp, vertical = if (compact) 4.dp else 8.dp),
                     verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)
                 ) {
                     PokerGlassPanel(

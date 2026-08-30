@@ -80,7 +80,7 @@ fun PokerLobbyHeader(
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp, vertical = 0.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         PokerImageButton(

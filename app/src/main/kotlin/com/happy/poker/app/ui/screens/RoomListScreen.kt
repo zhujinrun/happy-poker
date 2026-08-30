@@ -112,7 +112,7 @@ fun RoomListScreen(
                             .padding(horizontal = if (compact) 14.dp else 20.dp),
                         verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 12.dp),
                         contentPadding = PaddingValues(
-                            top = if (compact) 8.dp else 14.dp,
+                            top = if (compact) 4.dp else 8.dp,
                             bottom = 22.dp
                         )
                     ) {

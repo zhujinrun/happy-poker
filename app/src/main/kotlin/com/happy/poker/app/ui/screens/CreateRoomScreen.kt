@@ -74,7 +74,7 @@ fun CreateRoomScreen(
                         .fillMaxSize()
                         .weight(1f)
                         .navigationBarsPadding()
-                        .padding(horizontal = 20.dp, vertical = if (compact) 8.dp else 18.dp),
+                        .padding(horizontal = 20.dp, vertical = if (compact) 4.dp else 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     PokerGlassPanel(

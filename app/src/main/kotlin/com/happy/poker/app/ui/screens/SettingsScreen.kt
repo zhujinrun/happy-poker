@@ -133,7 +133,7 @@ fun SettingsScreen(
                         .navigationBarsPadding()
                         .padding(
                             horizontal = if (compact) 12.dp else 18.dp,
-                            vertical = if (compact) 8.dp else 12.dp
+                            vertical = if (compact) 4.dp else 8.dp
                         ),
                     horizontalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp)
                 ) {
