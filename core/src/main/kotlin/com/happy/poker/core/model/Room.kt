@@ -23,6 +23,12 @@ class Room(
     val bottomCards: List<Card> = emptyList(),
     val createdAt: Long = System.currentTimeMillis()
 ) {
+    init {
+        require(maxPlayers in SUPPORTED_PLAYER_COUNTS) {
+            "房间人数只支持2人或3人"
+        }
+    }
+
     var state: RoomState = RoomState.Waiting
     val players: MutableList<Player> = mutableListOf()
     var currentBid: Int = 0
@@ -85,5 +91,9 @@ class Room(
 
     fun setSpringMultiplier() {
         multiplier *= 2
+    }
+
+    companion object {
+        val SUPPORTED_PLAYER_COUNTS: List<Int> = listOf(2, 3)
     }
 }

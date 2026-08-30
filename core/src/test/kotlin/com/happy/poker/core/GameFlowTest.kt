@@ -88,6 +88,18 @@ class GameFlowTest {
     }
 
     @Test
+    fun testFourPlayerRoomIsRejected() {
+        assertThrows(IllegalArgumentException::class.java) {
+            Room(
+                id = "four-player-room",
+                name = "四人房",
+                hostId = "player1",
+                maxPlayers = 4
+            )
+        }
+    }
+
+    @Test
     fun testBidToBecomeLandlord() {
         gameFlow.startGame()
         val firstBidder = room.currentBidder!!

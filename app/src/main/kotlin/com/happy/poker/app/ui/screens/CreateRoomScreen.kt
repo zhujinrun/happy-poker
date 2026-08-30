@@ -48,6 +48,7 @@ import com.happy.poker.app.ui.theme.Green600
 import com.happy.poker.app.ui.theme.HappyPokerTheme
 import com.happy.poker.app.ui.theme.TextGray
 import com.happy.poker.app.ui.theme.TextWhite
+import com.happy.poker.core.model.Room
 
 @Composable
 fun CreateRoomScreen(
@@ -138,7 +139,7 @@ fun CreateRoomScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    listOf(2, 3, 4).forEach { size ->
+                                    Room.SUPPORTED_PLAYER_COUNTS.forEach { size ->
                                         RoomSizeChip(
                                             text = "${size}人",
                                             selected = maxPlayers == size,
@@ -150,7 +151,7 @@ fun CreateRoomScreen(
                             }
 
                             Text(
-                                text = if (maxPlayers == 3) "经典斗地主人数" else "自定义联机人数",
+                                text = if (maxPlayers == 3) "经典斗地主人数" else "双人联机模式",
                                 color = TextWhite.copy(alpha = 0.68f),
                                 fontSize = 13.sp,
                                 textAlign = TextAlign.Center

@@ -135,6 +135,11 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun createRoom(roomName: String, maxPlayers: Int) {
+        if (maxPlayers !in Room.SUPPORTED_PLAYER_COUNTS) {
+            showFeedback("当前只支持2人或3人房间")
+            return
+        }
+
         viewModelScope.launch {
             currentRoomMaxPlayers = maxPlayers
             updateUiState { it.copy(isSearching = true) }
@@ -148,6 +153,11 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun joinRoom(roomId: String, maxPlayers: Int = 3) {
+        if (maxPlayers !in Room.SUPPORTED_PLAYER_COUNTS) {
+            showFeedback("当前只支持2人或3人房间")
+            return
+        }
+
         viewModelScope.launch {
             currentRoomMaxPlayers = maxPlayers
             updateUiState { it.copy(isSearching = true) }
