@@ -1,6 +1,7 @@
 package com.happy.poker.app.sound
 
 import android.content.Context
+import com.happy.poker.app.settings.AppHaptics
 import com.happy.poker.core.model.HandPattern
 import com.happy.poker.core.model.PatternType
 import com.happy.poker.core.model.Rank
@@ -8,6 +9,8 @@ import com.happy.poker.core.model.Rank
 object GameAudio {
     @Volatile
     private var soundManager: SoundManager? = null
+    @Volatile
+    private var appContext: Context? = null
 
     private val singleCardSounds = mapOf(
         Rank.Three to SoundType.CARD_SINGLE_3,
@@ -60,6 +63,7 @@ object GameAudio {
     )
 
     fun init(context: Context) {
+        appContext = context.applicationContext
         if (soundManager != null) return
         synchronized(this) {
             if (soundManager == null) {
@@ -77,10 +81,11 @@ object GameAudio {
     }
 
     fun buttonClick() {
+        appContext?.let(AppHaptics::tap)
     }
 
     fun cardSelect() {
-        // 牌面选择不播报牌名，避免把单牌/对子语音带进操作过程。
+        appContext?.let(AppHaptics::tap)
     }
 
     fun playBid(bid: Int, isPass: Boolean) {

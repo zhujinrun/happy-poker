@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.happy.poker.app.R
 import com.happy.poker.app.ui.components.*
+import com.happy.poker.app.settings.AppSettingsManager
 import com.happy.poker.app.ui.theme.*
 import com.happy.poker.app.viewmodel.MultiplayerGameViewModel
 import com.happy.poker.app.viewmodel.PlayerUiState
@@ -32,6 +33,7 @@ import com.happy.poker.core.model.PatternType
 import com.happy.poker.core.model.PlayerRole
 import com.happy.poker.core.model.RoomState
 import kotlinx.coroutines.delay
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun MultiplayerGameScreen(
@@ -39,6 +41,8 @@ fun MultiplayerGameScreen(
     onBackClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val appSettingsManager = remember { AppSettingsManager(context) }
     val specialEffectsManager = remember { SpecialEffectsManager() }
     val specialEffectState by specialEffectsManager.effectState.collectAsState()
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
@@ -79,7 +83,8 @@ fun MultiplayerGameScreen(
                 isHost = uiState.room.isHost,
                 onReadyClick = { viewModel.setReady(true) },
                 onStartClick = { viewModel.startGame() },
-                onBackClick = onBackClick
+                onBackClick = onBackClick,
+                humanAvatarKey = appSettingsManager.getAvatarKey()
             )
             RoomState.Bidding, RoomState.Playing -> GameContent(
                 playerCards = uiState.playerCards,
@@ -100,6 +105,7 @@ fun MultiplayerGameScreen(
                 currentPlayerId = uiState.currentPlayerId,
                 lastPlayedBy = uiState.lastPlayedBy,
                 players = uiState.room.players,
+                humanAvatarKey = appSettingsManager.getAvatarKey(),
                 onBackClick = onBackClick
             )
             RoomState.Finished -> {
@@ -110,7 +116,9 @@ fun MultiplayerGameScreen(
                             PlayerRole.Farmer -> "农民"
                             else -> "未知"
                         },
-                        isLandlordWin = uiState.room.players.find { it.name == "我" }?.let { player ->
+                        isLandlordWin = uiState.room.players.find {
+                            it.id.startsWith("human_player_")
+                        }?.let { player ->
                             player.role == result.winnerRole || player.id == result.winnerId
                         } ?: true,
                         players = uiState.room.players.map { player ->
@@ -155,7 +163,8 @@ fun WaitingRoomContent(
     isHost: Boolean,
     onReadyClick: () -> Unit = {},
     onStartClick: () -> Unit = {},
-    onBackClick: () -> Unit = {}
+    onBackClick: () -> Unit = {},
+    humanAvatarKey: String = AppSettingsManager.DEFAULT_AVATAR
 ) {
     PokerScreenBackground {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -206,7 +215,8 @@ fun WaitingRoomContent(
                                     WaitingSeat(
                                         player = player,
                                         isHostSeat = player.id == room.hostId,
-                                        compact = compact
+                                        compact = compact,
+                                        humanAvatarKey = humanAvatarKey
                                     )
                                 }
                                 repeat((seatCount - room.players.size).coerceAtLeast(0)) {
@@ -286,9 +296,20 @@ fun WaitingRoomContent(
 private fun WaitingSeat(
     player: PlayerUiState,
     isHostSeat: Boolean,
-    compact: Boolean
+    compact: Boolean,
+    humanAvatarKey: String
 ) {
-    val avatarRes = if (player.id.hashCode() % 2 == 0) R.drawable.avatar_daheng else R.drawable.avatar_luoli
+    val avatarRes = if (player.id.startsWith("human_player")) {
+        when (humanAvatarKey) {
+            "daheng" -> R.drawable.avatar_daheng
+            "luoli" -> R.drawable.avatar_luoli
+            else -> R.drawable.avatar_yujie
+        }
+    } else if (player.id.hashCode() % 2 == 0) {
+        R.drawable.avatar_daheng
+    } else {
+        R.drawable.avatar_luoli
+    }
     val avatarSize = if (compact) 50.dp else 62.dp
     val seatWidth = if (compact) 84.dp else 96.dp
 
@@ -411,6 +432,7 @@ fun GameContent(
     currentPlayerId: String? = null,
     lastPlayedBy: String? = null,
     players: List<PlayerUiState> = emptyList(),
+    humanAvatarKey: String = AppSettingsManager.DEFAULT_AVATAR,
     onBackClick: () -> Unit = {}
 ) {
     GameScreenContent(
@@ -432,6 +454,7 @@ fun GameContent(
         currentPlayerId = currentPlayerId,
         lastPlayedCards = lastPlayedCards,
         lastPlayedBy = lastPlayedBy,
+        humanAvatarKey = humanAvatarKey,
         onBackClick = onBackClick
     )
 }

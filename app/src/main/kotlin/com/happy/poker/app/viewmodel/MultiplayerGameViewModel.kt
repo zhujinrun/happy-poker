@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.happy.poker.app.network.ConnectionState
 import com.happy.poker.app.network.MqttConfigManager
 import com.happy.poker.app.network.ReconnectManager
+import com.happy.poker.app.settings.AppSettingsManager
 import com.happy.poker.app.sound.GameAudio
 import com.happy.poker.core.ai.AiEvaluator
 import com.happy.poker.core.model.*
@@ -68,6 +69,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     private var currentRoomMaxPlayers: Int = 3
     private val reconnectManager = ReconnectManager()
     private val mqttConfigManager = MqttConfigManager(application)
+    private val appSettingsManager = AppSettingsManager(application)
     private var turnTimerJob: Job? = null
     private var turnTimerToken: Int = 0
 
@@ -137,7 +139,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
             currentRoomMaxPlayers = maxPlayers
             updateUiState { it.copy(isSearching = true) }
             val message = RoomCreateMessage(
-                playerName = "我",
+                playerName = appSettingsManager.getNickname(),
                 playerId = humanPlayerId,
                 maxPlayers = maxPlayers
             )
@@ -151,7 +153,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
             updateUiState { it.copy(isSearching = true) }
             val message = RoomJoinMessage(
                 roomId = roomId,
-                playerName = "我",
+                playerName = appSettingsManager.getNickname(),
                 playerId = humanPlayerId
             )
             mqttClient.sendMessage(Protocol.TOPIC_ROOM_JOIN, message)
@@ -345,7 +347,13 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                     roomId = message.roomId,
                     roomName = message.roomName,
                     players = listOf(
-                        PlayerUiState(humanPlayerId, "我", PlayerRole.Unknown, 0, true)
+                        PlayerUiState(
+                            humanPlayerId,
+                            appSettingsManager.getNickname(),
+                            PlayerRole.Unknown,
+                            0,
+                            true
+                        )
                     ),
                     maxPlayers = currentRoomMaxPlayers,
                     state = RoomState.Waiting,

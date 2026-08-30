@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import com.happy.poker.app.settings.AppSettingsManager
 import com.happy.poker.app.sound.GameAudio
 import kotlinx.coroutines.delay
 
@@ -27,6 +28,7 @@ class SplashActivity : ComponentActivity() {
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         super.onCreate(savedInstanceState)
         GameAudio.init(applicationContext)
+        GameAudio.setEnabled(AppSettingsManager(applicationContext).isSoundEnabled())
         enableEdgeToEdge()
         setContent {
             SplashScreen(onTimeout = {

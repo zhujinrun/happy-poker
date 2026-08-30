@@ -8,7 +8,7 @@ enum class PlayerRole(val displayName: String) {
 
 class Player(
     val id: String,
-    val name: String,
+    var name: String,
     val isAI: Boolean = false
 ) {
     var role: PlayerRole = PlayerRole.Unknown

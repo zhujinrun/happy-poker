@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.happy.poker.app.R
 import com.happy.poker.app.ui.components.*
+import com.happy.poker.app.settings.AppSettingsManager
 import com.happy.poker.app.sound.GameAudio
 import com.happy.poker.app.ui.theme.*
 import com.happy.poker.app.viewmodel.GameViewModel
@@ -43,6 +44,7 @@ import com.happy.poker.core.model.Rank
 import com.happy.poker.core.model.RoomState
 import com.happy.poker.core.model.Suit
 import kotlinx.coroutines.delay
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun GameScreen(
@@ -51,6 +53,8 @@ fun GameScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val specialEffectState by viewModel.specialEffectState.collectAsState()
+    val context = LocalContext.current
+    val appSettingsManager = remember { AppSettingsManager(context) }
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
     var visibleFeedbackId by remember { mutableStateOf(0) }
 
@@ -137,7 +141,8 @@ fun GameScreen(
                 currentPlayerId = uiState.currentPlayerId,
                 lastPlayedCards = uiState.lastPlayedCards,
                 lastPlayedBy = uiState.lastPlayedBy,
-                onBackClick = onBackClick
+                onBackClick = onBackClick,
+                humanAvatarKey = appSettingsManager.getAvatarKey()
             )
         }
         
@@ -269,6 +274,7 @@ fun GameScreenContent(
     currentPlayerId: String? = null,
     lastPlayedCards: List<GameCard>? = null,
     lastPlayedBy: String? = null,
+    humanAvatarKey: String = AppSettingsManager.DEFAULT_AVATAR,
     onBackClick: () -> Unit = {}
 ) {
     val humanPlayer = players.find {
@@ -420,6 +426,7 @@ fun GameScreenContent(
                     player = humanPlayer.copy(handSize = playerCards.size),
                     playerCards = playerCards,
                     selectedCards = selectedCards,
+                    avatarKey = humanAvatarKey,
                     onCardClick = onCardClick,
                     compact = compactHeight,
                     landscape = landscape,
@@ -1327,6 +1334,7 @@ private fun LocalPlayerDock(
     player: PlayerUiState,
     playerCards: List<GameCard>,
     selectedCards: Set<String>,
+    avatarKey: String,
     onCardClick: (GameCard) -> Unit,
     compact: Boolean,
     landscape: Boolean,
@@ -1409,6 +1417,7 @@ private fun LocalPlayerDock(
     ) {
         LocalPlayerBadge(
             player = player,
+            avatarKey = avatarKey,
             compact = compact,
             tightLandscape = tightLandscape,
             modifier = Modifier.width(
@@ -1441,6 +1450,7 @@ private fun LocalPlayerDock(
 @Composable
 private fun LocalPlayerBadge(
     player: PlayerUiState,
+    avatarKey: String,
     compact: Boolean = false,
     tightLandscape: Boolean = false,
     modifier: Modifier = Modifier
@@ -1450,7 +1460,7 @@ private fun LocalPlayerBadge(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         PlayerAvatar(
-            avatarRes = R.drawable.avatar_yujie,
+            avatarRes = avatarResourceForKey(avatarKey),
             role = player.role,
             compact = compact,
             tightLandscape = tightLandscape,
@@ -1477,6 +1487,13 @@ private fun LocalPlayerBadge(
         )
     }
 }
+
+private fun avatarResourceForKey(avatarKey: String): Int =
+    when (avatarKey) {
+        "daheng" -> R.drawable.avatar_daheng
+        "luoli" -> R.drawable.avatar_luoli
+        else -> R.drawable.avatar_yujie
+    }
 
 @Composable
 private fun TurnPrompt(

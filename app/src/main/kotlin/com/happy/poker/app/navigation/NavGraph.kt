@@ -11,6 +11,7 @@ import com.happy.poker.app.ui.screens.*
 import com.happy.poker.app.viewmodel.GameViewModel
 import com.happy.poker.app.viewmodel.MultiplayerGameViewModel
 import com.happy.poker.app.network.MqttConfigManager
+import com.happy.poker.app.settings.AppSettingsManager
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
@@ -31,6 +32,7 @@ fun NavGraph(
 ) {
     val context = LocalContext.current
     val mqttConfigManager = MqttConfigManager(context)
+    val appSettingsManager = AppSettingsManager(context)
 
     NavHost(
         navController = navController,
@@ -118,6 +120,7 @@ fun NavGraph(
 
         composable(Screen.Settings.route) {
             SettingsScreen(
+                appSettingsManager = appSettingsManager,
                 mqttConfigManager = mqttConfigManager,
                 onBackClick = {
                     navController.popBackStack()

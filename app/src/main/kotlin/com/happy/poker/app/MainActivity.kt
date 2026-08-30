@@ -11,6 +11,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import com.happy.poker.app.navigation.NavGraph
+import com.happy.poker.app.settings.AppSettingsManager
 import com.happy.poker.app.sound.GameAudio
 import com.happy.poker.app.ui.theme.HappyPokerTheme
 
@@ -19,6 +20,7 @@ class MainActivity : ComponentActivity() {
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         super.onCreate(savedInstanceState)
         GameAudio.init(applicationContext)
+        GameAudio.setEnabled(AppSettingsManager(applicationContext).isSoundEnabled())
         enableEdgeToEdge()
         setContent {
             HappyPokerTheme {

@@ -1,6 +1,7 @@
 package com.happy.poker.app.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.happy.poker.core.ai.AiEvaluator
 import com.happy.poker.core.ai.AiManager
@@ -8,6 +9,7 @@ import com.happy.poker.core.flow.GameCallback
 import com.happy.poker.core.flow.GameFlow
 import com.happy.poker.core.flow.GameState
 import com.happy.poker.core.model.*
+import com.happy.poker.app.settings.AppSettingsManager
 import com.happy.poker.app.sound.GameAudio
 import com.happy.poker.core.rules.Validator
 import com.happy.poker.app.effects.SpecialEffectsManager
@@ -64,7 +66,7 @@ data class GameResult(
     val multiplier: Int
 )
 
-class GameViewModel : ViewModel() {
+class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
 
@@ -77,6 +79,7 @@ class GameViewModel : ViewModel() {
     private var aiActionJob: Job? = null
     private var suppressFlowError: Boolean = false
     private val aiManager = AiManager()
+    private val appSettingsManager = AppSettingsManager(application)
     private val specialEffectsManager = SpecialEffectsManager()
     private val _specialEffectState = MutableStateFlow(SpecialEffectState(SpecialEffectType.Bomb))
     val specialEffectState: StateFlow<SpecialEffectState> = _specialEffectState.asStateFlow()
@@ -98,7 +101,7 @@ class GameViewModel : ViewModel() {
             maxPlayers = 3
         )
 
-        val humanPlayer = Player(humanPlayerId, "我", isAI = false)
+        val humanPlayer = Player(humanPlayerId, appSettingsManager.getNickname(), isAI = false)
         val aiPlayer1 = Player("ai_1", "电脑1", isAI = true)
         val aiPlayer2 = Player("ai_2", "电脑2", isAI = true)
 
@@ -132,6 +135,15 @@ class GameViewModel : ViewModel() {
     fun startGame() {
         gameSessionId += 1
         val sessionId = gameSessionId
+        val localName = appSettingsManager.getNickname()
+        room?.findPlayer(humanPlayerId)?.name = localName
+        updateUiState {
+            it.copy(
+                players = it.players.map { player ->
+                    if (player.id == humanPlayerId) player.copy(name = localName) else player
+                }
+            )
+        }
         stopHumanTurnTimer(resetSeconds = false)
         aiActionJob?.cancel()
         aiActionJob = null
