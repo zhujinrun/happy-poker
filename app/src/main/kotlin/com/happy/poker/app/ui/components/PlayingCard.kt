@@ -198,26 +198,31 @@ fun HandCards(
     maxStep: Dp = 38.dp,
     selectedLift: Dp = 20.dp
 ) {
+    val displayCards = cards.sortedWith(
+        compareByDescending<GameCard> { it.rank.value }
+            .thenBy { it.suit.ordinal }
+    )
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .height(containerHeight),
         contentAlignment = androidx.compose.ui.Alignment.BottomCenter
     ) {
-        val step = if (cards.size <= 1) {
+        val step = if (displayCards.size <= 1) {
             0.dp
         } else {
-            val availableStep = ((maxWidth - cardWidth).value / (cards.size - 1)).dp
+            val availableStep = ((maxWidth - cardWidth).value / (displayCards.size - 1)).dp
             availableStep.coerceIn(minStep, maxStep)
         }
-        val handWidth = if (cards.isEmpty()) 0.dp else cardWidth + (step.value * (cards.size - 1)).dp
+        val handWidth = if (displayCards.isEmpty()) 0.dp else cardWidth + (step.value * (displayCards.size - 1)).dp
 
         Box(
             modifier = Modifier
                 .width(handWidth)
                 .height(containerHeight)
         ) {
-            cards.forEachIndexed { index, card ->
+            displayCards.forEachIndexed { index, card ->
                 PlayingCard(
                     card = card,
                     isSelected = card.id in selectedCards,

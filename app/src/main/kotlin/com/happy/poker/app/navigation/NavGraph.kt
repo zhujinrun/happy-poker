@@ -1,6 +1,6 @@
 package com.happy.poker.app.navigation
 
-import android.app.Application
+import android.app.Activity
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -48,6 +48,9 @@ fun NavGraph(
                 },
                 onSettingsClick = {
                     navController.navigate(Screen.Settings.route)
+                },
+                onBackClick = {
+                    (context as? Activity)?.finish()
                 }
             )
         }

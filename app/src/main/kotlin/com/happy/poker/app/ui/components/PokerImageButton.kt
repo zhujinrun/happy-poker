@@ -16,7 +16,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -25,7 +24,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
 import com.happy.poker.app.sound.GameAudio
 import com.happy.poker.app.sound.SoundType
-import com.happy.poker.app.settings.AppHaptics
 import com.happy.poker.app.ui.theme.TextGray
 import com.happy.poker.app.ui.theme.TextWhite
 
@@ -46,7 +44,6 @@ fun PokerImageButton(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val hasPressedImage = pressedRes != null
-    val context = LocalContext.current
 
     Box(
         modifier = modifier
@@ -61,7 +58,7 @@ fun PokerImageButton(
                 indication = null,
                 enabled = enabled,
                 onClick = {
-                    AppHaptics.tap(context)
+                    GameAudio.buttonClick()
                     soundType?.let(GameAudio::play)
                     onClick()
                 }
@@ -100,7 +97,6 @@ fun PokerIconButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    val context = LocalContext.current
 
     Box(
         modifier = modifier
@@ -114,7 +110,6 @@ fun PokerIconButton(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = {
-                    AppHaptics.tap(context)
                     GameAudio.buttonClick()
                     onClick()
                 }

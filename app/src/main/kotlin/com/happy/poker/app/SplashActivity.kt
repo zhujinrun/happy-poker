@@ -6,7 +6,6 @@ import android.content.pm.ActivityInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -27,14 +26,21 @@ class SplashActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         super.onCreate(savedInstanceState)
+        configurePokerWindow()
         GameAudio.init(applicationContext)
         GameAudio.setEnabled(AppSettingsManager(applicationContext).isSoundEnabled())
-        enableEdgeToEdge()
         setContent {
             SplashScreen(onTimeout = {
                 startActivity(Intent(this@SplashActivity, MainActivity::class.java))
                 finish()
             })
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            configurePokerWindow()
         }
     }
 }

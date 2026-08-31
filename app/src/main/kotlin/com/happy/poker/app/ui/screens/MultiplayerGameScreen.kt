@@ -174,7 +174,6 @@ fun WaitingRoomContent(
             Column(modifier = Modifier.fillMaxSize()) {
                 PokerLobbyHeader(
                     title = room.roomName,
-                    subtitle = if (isHost) "你是房主，准备好后可以开局" else "等待房主开始游戏",
                     onBackClick = onBackClick,
                     trailing = {
                         PokerStatusPill(
@@ -186,14 +185,21 @@ fun WaitingRoomContent(
 
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxWidth()
                         .weight(1f)
-                        .navigationBarsPadding()
-                        .padding(horizontal = 18.dp, vertical = if (compact) 4.dp else 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)
+                        .padding(
+                            start = if (compact) 24.dp else 34.dp,
+                            end = if (compact) 24.dp else 34.dp,
+                            top = if (compact) 0.dp else 4.dp,
+                            bottom = if (compact) 12.dp else 18.dp
+                        ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(if (compact) 9.dp else 14.dp)
                 ) {
                     PokerGlassPanel(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .widthIn(max = 660.dp)
+                            .fillMaxWidth(),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
@@ -204,7 +210,7 @@ fun WaitingRoomContent(
                             Text(
                                 text = "入座情况",
                                 color = Gold500,
-                                fontSize = 18.sp,
+                                fontSize = if (compact) 16.sp else 18.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Row(
@@ -228,20 +234,14 @@ fun WaitingRoomContent(
 
                     PokerGlassPanel(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        contentAlignment = Alignment.TopCenter
+                            .widthIn(max = 500.dp)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
                     ) {
                         Column(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalArrangement = Arrangement.spacedBy(if (compact) 7.dp else 10.dp)
                         ) {
-                            Text(
-                                text = "房间信息",
-                                color = TextWhite,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold
-                            )
                             RoomMetaRow(label = "房间", value = room.roomName)
                             RoomMetaRow(label = "人数", value = "${room.players.size}/${room.maxPlayers}")
                             RoomMetaRow(label = "身份", value = if (isHost) "房主" else "玩家")
@@ -249,23 +249,26 @@ fun WaitingRoomContent(
                     }
 
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .widthIn(max = 380.dp)
+                            .fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        PokerIconButton(
-                            iconRes = R.drawable.poker_back_arrow,
+                        PokerImageButton(
+                            normalRes = R.drawable.btn_green,
+                            text = "退出",
                             onClick = onBackClick,
                             modifier = Modifier
                                 .weight(1f)
                                 .height(44.dp),
-                            iconSize = 22.dp,
+                            fontSize = 15.sp,
                             contentDescription = "返回房间列表"
                         )
 
                         if (isHost) {
                             PokerImageButton(
                                 normalRes = R.drawable.btn_orange,
-                                text = "开始",
+                                text = "开始游戏",
                                 onClick = onStartClick,
                                 enabled = room.players.size >= 2,
                                 modifier = Modifier

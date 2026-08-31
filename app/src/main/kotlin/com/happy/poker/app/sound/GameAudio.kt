@@ -77,15 +77,21 @@ object GameAudio {
     }
 
     fun play(soundType: SoundType) {
-        soundManager?.play(soundType)
+        runCatching {
+            soundManager?.play(soundType)
+        }
     }
 
     fun buttonClick() {
-        appContext?.let(AppHaptics::tap)
+        runCatching {
+            appContext?.let(AppHaptics::tap)
+        }
     }
 
     fun cardSelect() {
-        appContext?.let(AppHaptics::tap)
+        runCatching {
+            appContext?.let(AppHaptics::tap)
+        }
     }
 
     fun playBid(bid: Int, isPass: Boolean) {

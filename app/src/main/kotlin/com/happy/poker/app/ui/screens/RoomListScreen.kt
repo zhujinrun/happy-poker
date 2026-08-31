@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -74,7 +74,6 @@ fun RoomListScreen(
             Column(modifier = Modifier.fillMaxSize()) {
                 PokerLobbyHeader(
                     title = "联机大厅",
-                    subtitle = "选择牌局入座，或创建新房间",
                     onBackClick = onBackClick,
                     trailing = {
                         PokerImageButton(
@@ -89,39 +88,44 @@ fun RoomListScreen(
                     }
                 )
 
-                if (rooms.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .weight(1f)
-                            .padding(horizontal = 20.dp)
-                            .navigationBarsPadding(),
-                        contentAlignment = Alignment.Center
-                    ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(
+                            start = if (compact) 22.dp else 30.dp,
+                            end = if (compact) 22.dp else 30.dp,
+                            top = if (compact) 0.dp else 4.dp,
+                            bottom = if (compact) 12.dp else 18.dp
+                        )
+                ) {
+                    if (rooms.isEmpty()) {
                         EmptyRoomState(
                             compact = compact,
-                            onCreateRoomClick = onCreateRoomClick
+                            onCreateRoomClick = onCreateRoomClick,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .offset(y = if (compact) (-10).dp else (-18).dp)
                         )
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .weight(1f)
-                            .navigationBarsPadding()
-                            .padding(horizontal = if (compact) 14.dp else 20.dp),
-                        verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 12.dp),
-                        contentPadding = PaddingValues(
-                            top = if (compact) 4.dp else 8.dp,
-                            bottom = 22.dp
-                        )
-                    ) {
-                        items(rooms) { room ->
-                            RoomCard(
-                                room = room,
-                                compact = compact,
-                                onClick = { onRoomClick(room) }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .widthIn(max = 700.dp)
+                                .fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(if (compact) 9.dp else 12.dp),
+                            contentPadding = PaddingValues(
+                                top = if (compact) 0.dp else 4.dp,
+                                bottom = 16.dp
                             )
+                        ) {
+                            items(rooms) { room ->
+                                RoomCard(
+                                    room = room,
+                                    compact = compact,
+                                    onClick = { onRoomClick(room) }
+                                )
+                            }
                         }
                     }
                 }
@@ -133,35 +137,36 @@ fun RoomListScreen(
 @Composable
 private fun EmptyRoomState(
     compact: Boolean,
-    onCreateRoomClick: () -> Unit
+    onCreateRoomClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     PokerGlassPanel(
-        modifier = Modifier
-            .fillMaxWidth()
-            .widthIn(max = 480.dp),
+        modifier = modifier
+            .widthIn(max = 420.dp)
+            .fillMaxWidth(),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp)
+            verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp)
         ) {
             Image(
                 painter = painterResource(id = R.drawable.landlord_hat_icon),
                 contentDescription = null,
-                modifier = Modifier.size(if (compact) 52.dp else 70.dp),
+                modifier = Modifier.size(if (compact) 44.dp else 60.dp),
                 contentScale = ContentScale.Fit
             )
             Text(
                 text = "暂无可加入房间",
                 color = Gold500,
-                fontSize = if (compact) 20.sp else 24.sp,
+                fontSize = if (compact) 18.sp else 22.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
             )
             Text(
                 text = "开一个新牌局，等好友入座后就能开始",
                 color = TextWhite.copy(alpha = 0.76f),
-                fontSize = 14.sp,
+                fontSize = if (compact) 12.sp else 14.sp,
                 textAlign = TextAlign.Center
             )
             PokerImageButton(
@@ -195,17 +200,17 @@ fun RoomCard(
             .background(
                 Brush.horizontalGradient(
                     listOf(
-                        Color.Black.copy(alpha = 0.64f),
-                        Color(0xFF123923).copy(alpha = 0.76f)
+                        Color.Black.copy(alpha = 0.42f),
+                        Color(0xFF12366F).copy(alpha = 0.68f)
                     )
                 )
             )
-            .border(1.dp, Gold500.copy(alpha = if (isWaiting) 0.46f else 0.22f), shape)
+            .border(1.dp, TextWhite.copy(alpha = if (isWaiting) 0.18f else 0.10f), shape)
             .clickable(enabled = isWaiting && !isFull, onClick = {
                 GameAudio.buttonClick()
                 onClick()
             })
-            .padding(horizontal = if (compact) 12.dp else 16.dp, vertical = if (compact) 10.dp else 14.dp)
+            .padding(horizontal = if (compact) 12.dp else 16.dp, vertical = if (compact) 9.dp else 13.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),

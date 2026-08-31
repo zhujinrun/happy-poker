@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.content.pm.ActivityInfo
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -19,9 +18,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         super.onCreate(savedInstanceState)
+        configurePokerWindow()
         GameAudio.init(applicationContext)
         GameAudio.setEnabled(AppSettingsManager(applicationContext).isSoundEnabled())
-        enableEdgeToEdge()
         setContent {
             HappyPokerTheme {
                 Surface(
@@ -32,6 +31,13 @@ class MainActivity : ComponentActivity() {
                     NavGraph(navController = navController)
                 }
             }
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            configurePokerWindow()
         }
     }
 }

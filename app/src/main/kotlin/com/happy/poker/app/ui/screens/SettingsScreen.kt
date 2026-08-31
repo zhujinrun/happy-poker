@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -130,12 +129,13 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .navigationBarsPadding()
                         .padding(
-                            horizontal = if (compact) 12.dp else 18.dp,
-                            vertical = if (compact) 4.dp else 8.dp
+                            start = if (compact) 18.dp else 26.dp,
+                            end = if (compact) 18.dp else 26.dp,
+                            top = if (compact) 0.dp else 2.dp,
+                            bottom = if (compact) 10.dp else 16.dp
                         ),
-                    horizontalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp)
+                    horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp)
                 ) {
                     SettingsRail(
                         selectedSection = selectedSection,
@@ -145,7 +145,7 @@ fun SettingsScreen(
                             selectedSection = it
                         },
                         modifier = Modifier
-                            .width(if (compact) 156.dp else 196.dp)
+                            .width(if (compact) 124.dp else 148.dp)
                             .fillMaxHeight()
                     )
 
@@ -194,20 +194,13 @@ private fun SettingsRail(
     PokerGlassPanel(modifier = modifier) {
         Column(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(if (compact) 7.dp else 9.dp)
+            verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp)
         ) {
-            Text(
-                text = "偏好设置",
-                color = Gold500,
-                fontSize = if (compact) 16.sp else 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-
             Column(
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxSize()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(if (compact) 7.dp else 9.dp)
+                verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp)
             ) {
                 SettingsSection.entries.forEach { section ->
                     SettingsRailItem(
@@ -244,10 +237,10 @@ private fun SettingsRailItem(
                 shape = shape
             )
             .clickable(onClick = onClick)
-            .height(if (compact) 44.dp else 50.dp)
+            .height(if (compact) 42.dp else 46.dp)
             .padding(
-                horizontal = if (compact) 9.dp else 11.dp,
-                vertical = if (compact) 7.dp else 9.dp
+                horizontal = if (compact) 8.dp else 10.dp,
+                vertical = if (compact) 6.dp else 8.dp
             ),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -255,15 +248,15 @@ private fun SettingsRailItem(
             imageVector = section.icon,
             contentDescription = section.title,
             tint = if (selected) CardBlack else Gold500,
-            modifier = Modifier.size(if (compact) 20.dp else 22.dp)
+            modifier = Modifier.size(if (compact) 18.dp else 20.dp)
         )
         Text(
             text = section.title,
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = if (compact) 9.dp else 11.dp),
+                .padding(start = if (compact) 7.dp else 9.dp),
             color = if (selected) CardBlack else TextWhite,
-            fontSize = if (compact) 12.sp else 13.sp,
+            fontSize = if (compact) 11.sp else 12.sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1
         )
@@ -272,32 +265,25 @@ private fun SettingsRailItem(
 
 @Composable
 private fun SettingsPageHeader(
-    eyebrow: String,
     title: String,
     description: String,
     compact: Boolean
 ) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier.padding(bottom = if (compact) 12.dp else 16.dp)
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+        modifier = Modifier.padding(bottom = if (compact) 8.dp else 12.dp)
     ) {
-        Text(
-            text = eyebrow.uppercase(),
-            color = Gold500.copy(alpha = 0.82f),
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold
-        )
         Text(
             text = title,
             color = TextWhite,
-            fontSize = if (compact) 21.sp else 24.sp,
+            fontSize = if (compact) 18.sp else 21.sp,
             fontWeight = FontWeight.Bold
         )
         Text(
             text = description,
             color = TextWhite.copy(alpha = 0.62f),
-            fontSize = 12.sp,
-            lineHeight = 17.sp
+            fontSize = if (compact) 11.sp else 12.sp,
+            lineHeight = if (compact) 15.sp else 17.sp
         )
     }
 }
@@ -319,7 +305,6 @@ private fun ProfileSettingsPage(
             .verticalScroll(rememberScrollState())
     ) {
         SettingsPageHeader(
-            eyebrow = "PROFILE",
             title = "我的资料",
             description = "选择一个头像，留下你在牌桌上的名字。",
             compact = compact
@@ -337,14 +322,14 @@ private fun ProfileSettingsPage(
                 ProfileAvatar(
                     avatarKey = avatarKey,
                     compact = compact,
-                    modifier = Modifier.size(if (compact) 112.dp else 140.dp)
+                    modifier = Modifier.size(if (compact) 88.dp else 118.dp)
                 )
                 PokerStatusPill(text = "牌桌形象", color = Gold500)
             }
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp)
+                verticalArrangement = Arrangement.spacedBy(if (compact) 7.dp else 11.dp)
             ) {
                 SettingsTextField(
                     value = nickname,
@@ -469,7 +454,6 @@ private fun ExperienceSettingsPage(
             .verticalScroll(rememberScrollState())
     ) {
         SettingsPageHeader(
-            eyebrow = "EXPERIENCE",
             title = "游戏体验",
             description = "让每次出牌都有恰到好处的反馈。",
             compact = compact
@@ -676,7 +660,6 @@ private fun NetworkSettingsPage(
             .verticalScroll(rememberScrollState())
     ) {
         SettingsPageHeader(
-            eyebrow = "NETWORK",
             title = "网络配置",
             description = "配置联机大厅使用的 MQTT 服务器。",
             compact = compact
@@ -877,7 +860,7 @@ private fun SettingsTextField(
         keyboardOptions = keyboardOptions,
         modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = 10.dp),
+            .padding(bottom = 7.dp),
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedTextColor = TextWhite,
@@ -913,8 +896,8 @@ private fun ProfileAvatar(
             contentDescription = "当前头像",
             modifier = Modifier
                 .fillMaxWidth()
-                .height(if (compact) 142.dp else 176.dp)
-                .offset(y = if (avatarKey == "daheng") (-2).dp else 3.dp),
+                .height(if (compact) 118.dp else 150.dp)
+                .offset(y = if (avatarKey == "daheng") (-4).dp else 2.dp),
             alignment = Alignment.TopCenter,
             contentScale = ContentScale.FillWidth
         )
@@ -950,7 +933,7 @@ private fun AvatarOption(
         ProfileAvatar(
             avatarKey = avatarKey,
             compact = true,
-            modifier = Modifier.size(if (compact) 48.dp else 58.dp)
+            modifier = Modifier.size(if (compact) 44.dp else 52.dp)
         )
         Text(
             text = avatarDisplayName(avatarKey),
@@ -976,18 +959,20 @@ private fun avatarDisplayName(avatarKey: String): String =
     }
 
 private fun vibrate(context: Context) {
-    val vibrator = context.getSystemService(Vibrator::class.java)
-    if (vibrator?.hasVibrator() != true) return
+    runCatching {
+        val vibrator = context.getSystemService(Vibrator::class.java)
+        if (vibrator?.hasVibrator() != true) return
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        vibrator.vibrate(
-            VibrationEffect.createOneShot(
-                28L,
-                VibrationEffect.DEFAULT_AMPLITUDE
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(
+                VibrationEffect.createOneShot(
+                    28L,
+                    VibrationEffect.DEFAULT_AMPLITUDE
+                )
             )
-        )
-    } else {
-        @Suppress("DEPRECATION")
-        vibrator.vibrate(28L)
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(28L)
+        }
     }
 }

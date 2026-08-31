@@ -280,171 +280,167 @@ fun GameScreenContent(
     val humanPlayer = players.find {
         it.id == "human_player" || it.id.startsWith("human_player_") || it.name == "我"
     } ?: PlayerUiState("human_player", "我", PlayerRole.Unknown, playerCards.size)
-    val playedByName = players.find { it.id == lastPlayedBy }?.name.orEmpty()
-
     GameTable {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val tableMaxWidth = maxWidth
-            val compactHeight = maxHeight < 520.dp
+            val compactHeight = maxHeight < 430.dp
             val landscape = maxWidth > maxHeight
             val tightLandscape = landscape && maxHeight < 430.dp
-            val edgePadding = if (compactHeight) 8.dp else 10.dp
+            val sideInset = when {
+                tightLandscape -> 10.dp
+                compactHeight -> 12.dp
+                else -> 18.dp
+            }
             val centerWidthFraction = when {
-                tightLandscape -> 0.58f
-                compactHeight && landscape -> 0.66f
-                landscape -> 0.70f
-                else -> 0.94f
+                tightLandscape -> 0.52f
+                compactHeight && landscape -> 0.60f
+                landscape -> 0.64f
+                else -> 0.90f
             }
             val centerMaxWidth = when {
-                tightLandscape -> 420.dp
-                compactHeight -> 610.dp
-                landscape -> 560.dp
+                tightLandscape -> 440.dp
+                compactHeight -> 580.dp
+                landscape -> 640.dp
                 else -> 720.dp
             }
-            val topSpacing = when {
-                tightLandscape -> 0.dp
-                compactHeight -> 0.dp
-                landscape -> 2.dp
-                else -> 4.dp
+            val handCardWidth = when {
+                tightLandscape -> 54.dp
+                compactHeight -> 58.dp
+                landscape -> 66.dp
+                else -> 60.dp
             }
-            val centerSpacing = when {
-                tightLandscape -> 0.dp
-                compactHeight -> 2.dp
-                landscape -> 2.dp
-                else -> 4.dp
+            val handCardHeight = when {
+                tightLandscape -> 82.dp
+                compactHeight -> 88.dp
+                landscape -> 100.dp
+                else -> 90.dp
             }
-            val bottomSpacing = when {
-                tightLandscape -> 0.dp
-                compactHeight -> 4.dp
-                landscape -> 4.dp
-                else -> 8.dp
+            val selectedLift = when {
+                tightLandscape -> 20.dp
+                compactHeight -> 22.dp
+                else -> 24.dp
             }
-            val opponentLift = when {
-                tightLandscape -> 6.dp
-                compactHeight -> 6.dp
-                landscape -> 8.dp
-                else -> 8.dp
-            }
-            val playedAreaLift = when {
-                tightLandscape -> 48.dp
-                compactHeight -> 50.dp
-                landscape -> 54.dp
-                else -> 56.dp
-            }
-            val localDockDrop = when {
+            val handContainerHeight = handCardHeight + selectedLift + if (tightLandscape) 12.dp else 16.dp
+            val actionBottom = handContainerHeight + when {
                 tightLandscape -> 6.dp
                 compactHeight -> 8.dp
-                landscape -> 8.dp
-                else -> 10.dp
+                else -> 14.dp
+            }
+            val opponentOffsetY = when {
+                tightLandscape -> (-42).dp
+                compactHeight -> (-36).dp
+                landscape -> (-30).dp
+                else -> (-24).dp
             }
 
-            Column(
+            PokerTopHud(
+                currentBid = currentBid,
+                bottomCards = bottomCards,
+                players = players,
+                onBackClick = onBackClick,
+                landscape = landscape,
+                compact = compactHeight,
+                tightLandscape = tightLandscape,
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = edgePadding)
-            ) {
-                PokerTopHud(
-                    multiplier = multiplier,
+                    .align(Alignment.TopCenter)
+                    .padding(horizontal = sideInset, vertical = if (tightLandscape) 4.dp else 7.dp)
+                    .zIndex(10f)
+            )
+
+            OpponentStrip(
+                players = players,
+                currentPlayerId = currentPlayerId,
+                compact = compactHeight,
+                tightLandscape = tightLandscape,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .padding(horizontal = sideInset)
+                    .offset(y = opponentOffsetY)
+                    .zIndex(3f)
+            )
+
+            CenterPlayedArea(
+                lastPlayedCards = lastPlayedCards,
+                isBidTurn = isBidTurn,
+                isPlayTurn = isPlayTurn,
+                compact = compactHeight,
+                landscape = landscape,
+                tightLandscape = tightLandscape,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(y = if (isBidTurn || isPlayTurn) (-20).dp else (-8).dp)
+                    .fillMaxWidth(centerWidthFraction)
+                    .widthIn(max = centerMaxWidth)
+                    .zIndex(4f)
+            )
+
+            if (isBidTurn || isPlayTurn) {
+                BattleActionStrip(
+                    isBidTurn = isBidTurn,
+                    isPlayTurn = isPlayTurn,
                     currentBid = currentBid,
-                    bottomCards = bottomCards,
-                    players = players,
-                    onBackClick = onBackClick,
-                    landscape = landscape,
-                    compact = compactHeight,
-                    tightLandscape = tightLandscape,
-                    modifier = Modifier
-                        .statusBarsPadding()
-                        .zIndex(5f)
-                )
-
-                Spacer(modifier = Modifier.height(topSpacing))
-
-                OpponentStrip(
-                    players = players,
-                    currentPlayerId = currentPlayerId,
-                    compact = compactHeight,
-                    tightLandscape = tightLandscape,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .offset(y = -opponentLift)
-                        .zIndex(2f)
-                )
-
-                Spacer(modifier = Modifier.height(centerSpacing))
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.TopCenter
-                ) {
-                    CenterPlayedArea(
-                        lastPlayedCards = lastPlayedCards,
-                        playedByName = playedByName,
-                        isBidTurn = isBidTurn,
-                        isPlayTurn = isPlayTurn,
-                        compact = compactHeight,
-                        landscape = landscape,
-                        tightLandscape = tightLandscape,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = when {
-                                tightLandscape -> 2.dp
-                                compactHeight -> 8.dp
-                                landscape -> 10.dp
-                                else -> 12.dp
-                            })
-                            .offset(y = if (isBidTurn || isPlayTurn) (-playedAreaLift) else 0.dp)
-                            .fillMaxWidth(centerWidthFraction)
-                            .widthIn(max = centerMaxWidth)
-                            .zIndex(3f)
-                    )
-                    if (isBidTurn || isPlayTurn) {
-                        BattleActionStrip(
-                            isBidTurn = isBidTurn,
-                            isPlayTurn = isPlayTurn,
-                            currentBid = currentBid,
-                            turnSecondsRemaining = turnSecondsRemaining,
-                            onBidClick = onBidClick,
-                            onBidPassClick = onBidPassClick,
-                            onPlayClick = onPlayClick,
-                            onPassClick = onPassClick,
-                            onHintClick = onHintClick,
-                            compact = compactHeight,
-                            landscape = landscape,
-                            tightLandscape = tightLandscape,
-                            showLabel = tableMaxWidth >= 520.dp,
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = bottomSpacing)
-                                .zIndex(4f)
-                        )
-                    }
-                }
-
-                LocalPlayerDock(
-                    player = humanPlayer.copy(handSize = playerCards.size),
-                    playerCards = playerCards,
-                    selectedCards = selectedCards,
-                    avatarKey = humanAvatarKey,
-                    onCardClick = onCardClick,
+                    turnSecondsRemaining = turnSecondsRemaining,
+                    onBidClick = onBidClick,
+                    onBidPassClick = onBidPassClick,
+                    onPlayClick = onPlayClick,
+                    onPassClick = onPassClick,
+                    onHintClick = onHintClick,
                     compact = compactHeight,
                     landscape = landscape,
                     tightLandscape = tightLandscape,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .zIndex(1f)
+                        .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
-                        .offset(y = localDockDrop)
+                        .padding(bottom = actionBottom)
+                        .zIndex(8f)
                 )
             }
+
+            LocalPlayerBadge(
+                player = humanPlayer.copy(handSize = playerCards.size),
+                avatarKey = humanAvatarKey,
+                compact = compactHeight,
+                tightLandscape = tightLandscape,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .navigationBarsPadding()
+                    .padding(start = sideInset, bottom = if (tightLandscape) 6.dp else 9.dp)
+                    .zIndex(9f)
+            )
+
+            HandCards(
+                cards = playerCards,
+                selectedCards = selectedCards,
+                onCardClick = onCardClick,
+                cardWidth = handCardWidth,
+                cardHeight = handCardHeight,
+                containerHeight = handContainerHeight,
+                minStep = if (tightLandscape) 14.dp else 16.dp,
+                maxStep = if (tightLandscape) 34.dp else 40.dp,
+                selectedLift = selectedLift,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = if (tightLandscape) 0.dp else 4.dp)
+                    .fillMaxWidth(if (tightLandscape) 0.66f else 0.70f)
+                    .widthIn(max = if (tightLandscape) 720.dp else 860.dp)
+                    .zIndex(7f)
+            )
+
+            TableBottomStatus(
+                multiplier = multiplier,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(end = sideInset, bottom = if (tightLandscape) 8.dp else 12.dp)
+                    .zIndex(9f)
+            )
         }
     }
 }
 
 @Composable
 private fun PokerTopHud(
-    multiplier: Int,
     currentBid: Int,
     bottomCards: List<GameCard>,
     players: List<PlayerUiState>,
@@ -455,74 +451,43 @@ private fun PokerTopHud(
     modifier: Modifier = Modifier
 ) {
     val sideWidth = when {
-        tightLandscape -> 88.dp
-        compact -> 112.dp
-        landscape -> 120.dp
+        tightLandscape -> 106.dp
+        compact -> 122.dp
+        landscape -> 142.dp
         else -> 132.dp
-    }
-    val bottomCardsOffsetY = when {
-        tightLandscape -> (-3).dp
-        compact -> (-3).dp
-        landscape -> (-4).dp
-        else -> (-5).dp
     }
 
     Row(
         modifier = modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal = when {
-                            tightLandscape -> 8.dp
-                            compact -> 8.dp
-                            else -> 14.dp
-                        },
-                        vertical = when {
-                            tightLandscape -> 0.dp
-                            compact -> 0.dp
-                            else -> 0.dp
-                        }
-                    ),
+            .fillMaxWidth(),
         verticalAlignment = Alignment.Top
     ) {
-        Box(modifier = Modifier.width(sideWidth)) {
+        Row(
+            modifier = Modifier.width(sideWidth),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(if (tightLandscape) 7.dp else 10.dp)
+        ) {
             PokerNavChip(
                 text = "返回",
                 onClick = onBackClick,
                 tightLandscape = tightLandscape,
-                modifier = Modifier.width(if (tightLandscape) 56.dp else if (compact) 64.dp else 72.dp)
+                modifier = Modifier
+                    .width(if (tightLandscape) 38.dp else 44.dp)
+                    .height(if (tightLandscape) 46.dp else 52.dp)
             )
         }
 
         BottomCardsTray(
             cards = bottomCards,
+            currentBid = currentBid,
             isRevealed = players.any { it.role == PlayerRole.Landlord },
             landscape = landscape,
             compact = compact,
             tightLandscape = tightLandscape,
-            modifier = Modifier
-                .weight(1f)
-                .offset(y = bottomCardsOffsetY)
+            modifier = Modifier.weight(1f)
         )
 
-        Row(
-            modifier = Modifier.width(sideWidth),
-            horizontalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 8.dp, Alignment.End)
-        ) {
-            HudMetric(
-                label = "倍数",
-                value = "${multiplier}x",
-                valueColor = Gold500,
-                compact = compact,
-                tightLandscape = tightLandscape
-            )
-            HudMetric(
-                label = "叫分",
-                value = currentBid.takeIf { it > 0 }?.toString() ?: "-",
-                valueColor = TextWhite,
-                compact = compact,
-                tightLandscape = tightLandscape
-            )
-        }
+        Spacer(modifier = Modifier.width(sideWidth))
     }
 }
 
@@ -536,63 +501,16 @@ private fun PokerNavChip(
     PokerIconButton(
         iconRes = R.drawable.poker_back_arrow,
         contentDescription = text,
-        modifier = modifier
-            .height(if (tightLandscape) 30.dp else 36.dp),
-        iconSize = if (tightLandscape) 18.dp else 22.dp,
+        modifier = modifier,
+        iconSize = if (tightLandscape) 30.dp else 36.dp,
         onClick = onClick
     )
 }
 
 @Composable
-private fun HudMetric(
-    label: String,
-    value: String,
-    valueColor: Color,
-    compact: Boolean = false,
-    tightLandscape: Boolean = false
-) {
-    val shape = RoundedCornerShape(12.dp)
-    Column(
-        modifier = Modifier
-            .width(
-                when {
-                    tightLandscape -> 46.dp
-                    compact -> 52.dp
-                    else -> 62.dp
-                }
-            )
-            .clip(shape)
-            .background(Color.Black.copy(alpha = 0.38f))
-            .border(1.dp, Color.White.copy(alpha = 0.14f), shape)
-            .padding(vertical = if (tightLandscape) 3.dp else if (compact) 4.dp else 5.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = label,
-            color = TextGray,
-            fontSize = when {
-                tightLandscape -> 8.sp
-                compact -> 9.sp
-                else -> 10.sp
-            }
-        )
-        Text(
-            text = value,
-            color = valueColor,
-            fontSize = when {
-                tightLandscape -> 13.sp
-                compact -> 15.sp
-                else -> 17.sp
-            },
-            fontWeight = FontWeight.Bold,
-            maxLines = 1
-        )
-    }
-}
-
-@Composable
 private fun BottomCardsTray(
     cards: List<GameCard>,
+    currentBid: Int,
     isRevealed: Boolean,
     landscape: Boolean,
     tightLandscape: Boolean,
@@ -600,45 +518,35 @@ private fun BottomCardsTray(
     modifier: Modifier = Modifier
 ) {
     val trayCardWidth = when {
-        tightLandscape -> 30.dp
-        compact -> 34.dp
-        landscape -> 36.dp
-        else -> 40.dp
+        tightLandscape -> 48.dp
+        compact -> 50.dp
+        landscape -> 52.dp
+        else -> 54.dp
     }
     val trayCardHeight = when {
-        tightLandscape -> 42.dp
-        compact -> 48.dp
-        landscape -> 50.dp
-        else -> 56.dp
+        tightLandscape -> 70.dp
+        compact -> 74.dp
+        landscape -> 78.dp
+        else -> 80.dp
     }
 
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
+    Row(
+        modifier = modifier
+            .widthIn(max = if (tightLandscape) 390.dp else 520.dp)
+            .padding(horizontal = if (compact) 6.dp else 8.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 6.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = "底牌",
-            color = TextGray,
-            fontSize = when {
-                tightLandscape -> 9.sp
-                compact -> 10.sp
-                landscape -> 10.sp
-                else -> 11.sp
-            },
-            fontWeight = FontWeight.Medium
-        )
         Row(
-            modifier = Modifier.padding(top = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(if (compact || landscape) (-5).dp else (-7).dp),
+            horizontalArrangement = Arrangement.spacedBy((-6).dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (isRevealed && cards.isNotEmpty()) {
                 cards.take(3).forEach { card ->
-                    SmallPlayingCard(
+                    TopMiniPlayingCard(
                         card = card,
-                        modifier = Modifier
-                            .width(trayCardWidth)
-                            .height(trayCardHeight)
+                        width = trayCardWidth,
+                        height = trayCardHeight
                     )
                 }
             } else {
@@ -647,6 +555,128 @@ private fun BottomCardsTray(
                 }
             }
         }
+
+        TopBidInfo(
+            currentBid = currentBid,
+            landscape = landscape,
+            compact = compact,
+            tightLandscape = tightLandscape
+        )
+    }
+}
+
+@Composable
+private fun TopBidInfo(
+    currentBid: Int,
+    landscape: Boolean,
+    compact: Boolean,
+    tightLandscape: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(if (tightLandscape) 1.dp else 2.dp)
+    ) {
+        Text(
+            text = "底分 20",
+            color = TextWhite.copy(alpha = 0.88f),
+            fontSize = when {
+                tightLandscape -> 10.sp
+                compact -> 11.sp
+                landscape -> 12.sp
+                else -> 12.sp
+            },
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
+        )
+        TopBidStatus(
+            currentBid = currentBid,
+            compact = compact,
+            tightLandscape = tightLandscape
+        )
+    }
+}
+
+@Composable
+private fun TopBidStatus(
+    currentBid: Int,
+    compact: Boolean,
+    tightLandscape: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val valueText = "x${currentBid.takeIf { it > 0 } ?: "-"}"
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(Color.Black.copy(alpha = 0.30f))
+            .padding(
+                start = if (tightLandscape) 4.dp else 5.dp,
+                end = if (tightLandscape) 9.dp else 12.dp,
+                top = if (tightLandscape) 2.dp else 3.dp,
+                bottom = if (tightLandscape) 2.dp else 3.dp
+            ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(
+                    when {
+                        tightLandscape -> 24.dp
+                        compact -> 26.dp
+                        else -> 28.dp
+                    }
+                )
+                .clip(CircleShape)
+                .background(Color(0xFFFFA629)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "叫",
+                color = TextWhite,
+                fontSize = when {
+                    tightLandscape -> 12.sp
+                    compact -> 13.sp
+                    else -> 14.sp
+                },
+                fontWeight = FontWeight.Black
+            )
+        }
+
+        Text(
+            text = "  $valueText",
+            color = Gold500,
+            fontSize = when {
+                tightLandscape -> 14.sp
+                compact -> 15.sp
+                else -> 16.sp
+            },
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun TopMiniPlayingCard(
+    card: GameCard,
+    width: androidx.compose.ui.unit.Dp,
+    height: androidx.compose.ui.unit.Dp
+) {
+    Card(
+        modifier = Modifier
+            .width(width)
+            .height(height),
+        shape = RoundedCornerShape(4.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Image(
+            painter = painterResource(id = getCardDrawableId(card)),
+            contentDescription = card.displayName,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit
+        )
     }
 }
 
@@ -657,16 +687,16 @@ private fun MiniCardBack(
     tightLandscape: Boolean = false
 ) {
     val cardWidth = when {
-        tightLandscape -> 30.dp
-        compact -> 34.dp
-        landscape -> 36.dp
-        else -> 40.dp
+        tightLandscape -> 48.dp
+        compact -> 50.dp
+        landscape -> 52.dp
+        else -> 54.dp
     }
     val cardHeight = when {
-        tightLandscape -> 42.dp
-        compact -> 48.dp
-        landscape -> 50.dp
-        else -> 56.dp
+        tightLandscape -> 70.dp
+        compact -> 74.dp
+        landscape -> 78.dp
+        else -> 80.dp
     }
 
     Card(
@@ -680,7 +710,7 @@ private fun MiniCardBack(
             painter = painterResource(id = R.drawable.card_back_new),
             contentDescription = "底牌牌背",
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Fit
         )
     }
 }
@@ -696,9 +726,9 @@ private fun OpponentStrip(
     val leftPlayer = players.getOrNull(1)
     val rightPlayer = players.getOrNull(2)
     val badgeWidth = when {
-        tightLandscape -> 104.dp
-        compact -> 132.dp
-        else -> 148.dp
+        tightLandscape -> 126.dp
+        compact -> 144.dp
+        else -> 164.dp
     }
 
     Row(
@@ -712,6 +742,7 @@ private fun OpponentStrip(
             isCurrentPlayer = leftPlayer?.id == currentPlayerId,
             compact = compact,
             tightLandscape = tightLandscape,
+            countOnStart = false,
             modifier = Modifier.width(badgeWidth)
         )
 
@@ -721,6 +752,7 @@ private fun OpponentStrip(
             isCurrentPlayer = rightPlayer?.id == currentPlayerId,
             compact = compact,
             tightLandscape = tightLandscape,
+            countOnStart = true,
             modifier = Modifier.width(badgeWidth)
         )
     }
@@ -733,6 +765,7 @@ private fun PlayerBadgeCard(
     isCurrentPlayer: Boolean,
     compact: Boolean,
     tightLandscape: Boolean,
+    countOnStart: Boolean,
     modifier: Modifier = Modifier
 ) {
     if (player == null) {
@@ -740,17 +773,16 @@ private fun PlayerBadgeCard(
         return
     }
 
-    val shape = RoundedCornerShape(16.dp)
-    val borderColor = if (isCurrentPlayer) Gold500 else Color.White.copy(alpha = 0.16f)
+    val borderColor = if (isCurrentPlayer) Gold500 else Color.White.copy(alpha = 0.24f)
     val cardHeight = when {
-        tightLandscape -> 60.dp
-        compact -> 78.dp
-        else -> 112.dp
+        tightLandscape -> 116.dp
+        compact -> 126.dp
+        else -> 142.dp
     }
     val avatarSize = when {
-        tightLandscape -> 36.dp
-        compact -> 46.dp
-        else -> 58.dp
+        tightLandscape -> 58.dp
+        compact -> 66.dp
+        else -> 74.dp
     }
 
     Box(
@@ -759,45 +791,57 @@ private fun PlayerBadgeCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(shape)
-                .background(Color.Black.copy(alpha = if (isCurrentPlayer) 0.45f else 0.30f))
-                .border(1.dp, borderColor, shape)
-                .padding(
-                    when {
-                        tightLandscape -> 5.dp
-                        compact -> 6.dp
-                        else -> 8.dp
-                    }
-                ),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(top = if (isCurrentPlayer) 0.dp else 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = if (countOnStart) Arrangement.End else Arrangement.Start
         ) {
-            PlayerAvatar(
-                avatarRes = avatarRes,
-                role = player.role,
-                compact = compact,
-                tightLandscape = tightLandscape,
-                modifier = Modifier.size(avatarSize)
-            )
-
-            Spacer(modifier = Modifier.width(if (compact) 6.dp else 8.dp))
+            if (countOnStart) {
+                CardCountPlate(player.handSize, compact = compact, modifier = Modifier.padding(end = 6.dp))
+            }
 
             Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.Start
+                modifier = Modifier
+                    .width(if (tightLandscape) 78.dp else 92.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color(0xFF101A36).copy(alpha = if (isCurrentPlayer) 0.68f else 0.48f))
+                    .border(1.dp, borderColor, RoundedCornerShape(18.dp))
+                    .padding(horizontal = 5.dp, vertical = if (tightLandscape) 5.dp else 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                PlayerAvatar(
+                    avatarRes = avatarRes,
+                    role = player.role,
+                    compact = compact,
+                    tightLandscape = tightLandscape,
+                    modifier = Modifier.size(avatarSize)
+                )
+                PlayerLevelTag(compact = compact)
                 Text(
                     text = player.name,
                     color = TextWhite,
                     fontSize = when {
-                        tightLandscape -> 11.sp
-                        compact -> 12.sp
-                        else -> 13.sp
+                        tightLandscape -> 10.sp
+                        compact -> 11.sp
+                        else -> 12.sp
                     },
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp)
                 )
-                OpponentMiniHand(cardCount = player.handSize, compact = compact)
+                Text(
+                    text = "豆  --",
+                    color = Gold500,
+                    fontSize = when {
+                        tightLandscape -> 9.sp
+                        compact -> 10.sp
+                        else -> 11.sp
+                    },
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
                 if (!player.isOnline) {
                     Text(
                         text = "离线",
@@ -810,7 +854,59 @@ private fun PlayerBadgeCard(
                     )
                 }
             }
+
+            if (!countOnStart) {
+                CardCountPlate(player.handSize, compact = compact, modifier = Modifier.padding(start = 6.dp))
+            }
         }
+    }
+}
+
+@Composable
+private fun PlayerLevelTag(compact: Boolean) {
+    Text(
+        text = "知府 I",
+        color = TextWhite,
+        fontSize = if (compact) 8.sp else 9.sp,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        modifier = Modifier
+            .offset(y = (-2).dp)
+            .clip(RoundedCornerShape(999.dp))
+            .background(Color(0xFF2C8B74))
+            .border(1.dp, Color.White.copy(alpha = 0.45f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 8.dp, vertical = 1.dp)
+    )
+}
+
+@Composable
+private fun CardCountPlate(
+    count: Int,
+    compact: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .width(if (compact) 28.dp else 32.dp)
+            .height(if (compact) 40.dp else 48.dp)
+            .clip(RoundedCornerShape(5.dp))
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF5BA5E5),
+                        Color(0xFF234A93)
+                    )
+                )
+            )
+            .border(1.dp, Color.White.copy(alpha = 0.62f), RoundedCornerShape(5.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = count.toString(),
+            color = TextWhite,
+            fontSize = if (compact) 19.sp else 22.sp,
+            fontWeight = FontWeight.Black
+        )
     }
 }
 
@@ -841,6 +937,16 @@ private fun PlayerAvatar(
         isMaleAvatar -> if (tightLandscape) (-2).dp else 0.dp
         compact -> 2.dp
         else -> 4.dp
+    }
+    val landlordHatSize = when {
+        tightLandscape -> 26.dp
+        compact -> 28.dp
+        else -> 32.dp
+    }
+    val landlordHatOffsetY = when {
+        tightLandscape -> (-2).dp
+        compact -> (-3).dp
+        else -> (-4).dp
     }
 
     Box(modifier = modifier) {
@@ -881,8 +987,9 @@ private fun PlayerAvatar(
                 contentDescription = "地主",
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .size(if (compact) 24.dp else 30.dp)
-                    .offset(y = if (compact) (-10).dp else (-12).dp),
+                    .size(landlordHatSize)
+                    .offset(y = landlordHatOffsetY)
+                    .zIndex(2f),
                 contentScale = ContentScale.Fit
             )
         }
@@ -931,7 +1038,6 @@ private fun OpponentMiniHand(cardCount: Int, compact: Boolean = false) {
 @Composable
 private fun CenterPlayedArea(
     lastPlayedCards: List<GameCard>?,
-    playedByName: String,
     isBidTurn: Boolean,
     isPlayTurn: Boolean,
     compact: Boolean,
@@ -939,54 +1045,26 @@ private fun CenterPlayedArea(
     tightLandscape: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(28.dp)
     val panelHeight = when {
-        tightLandscape -> 144.dp
-        compact -> 152.dp
-        landscape -> 174.dp
-        else -> 198.dp
+        tightLandscape -> 126.dp
+        compact -> 138.dp
+        landscape -> 150.dp
+        else -> 168.dp
     }
     Box(
         modifier = modifier
             .height(panelHeight)
-            .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color.Black.copy(alpha = 0.10f),
-                        Color(0x55103F2F),
-                        Color.Black.copy(alpha = 0.18f)
-                    )
-                )
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.16f), shape)
             .padding(horizontal = 12.dp, vertical = if (landscape) 8.dp else 10.dp),
         contentAlignment = Alignment.Center
     ) {
         if (!lastPlayedCards.isNullOrEmpty()) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "${playedByName.ifEmpty { "上家" }} 出牌",
-                    color = Gold500,
-                    fontSize = when {
-                        tightLandscape -> 12.sp
-                        compact -> 13.sp
-                        else -> 14.sp
-                    },
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = if (compact) 6.dp else 10.dp)
-                )
-                PlayedCardsFan(
-                    cards = lastPlayedCards,
-                    landscape = landscape,
-                    compact = compact,
-                    tightLandscape = tightLandscape,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+            PlayedCardsFan(
+                cards = lastPlayedCards,
+                landscape = landscape,
+                compact = compact,
+                tightLandscape = tightLandscape,
+                modifier = Modifier.fillMaxWidth()
+            )
         } else {
             TurnPrompt(
                 text = when {
@@ -1010,9 +1088,9 @@ private fun PlayedCardsFan(
     modifier: Modifier = Modifier
 ) {
     val fanHeight = when {
-        tightLandscape -> 92.dp
-        compact -> 102.dp
-        landscape -> 112.dp
+        tightLandscape -> 112.dp
+        compact -> 120.dp
+        landscape -> 130.dp
         else -> 128.dp
     }
     BoxWithConstraints(
@@ -1020,22 +1098,22 @@ private fun PlayedCardsFan(
         contentAlignment = Alignment.Center
     ) {
         val cardWidth = when {
-            tightLandscape && cards.size > 12 -> 32.dp
-            tightLandscape -> 42.dp
-            compact && cards.size > 12 -> 34.dp
-            landscape && cards.size > 12 -> 40.dp
-            compact -> 46.dp
-            landscape -> 50.dp
+            tightLandscape && cards.size > 12 -> 38.dp
+            tightLandscape -> 50.dp
+            compact && cards.size > 12 -> 40.dp
+            landscape && cards.size > 12 -> 44.dp
+            compact -> 54.dp
+            landscape -> 58.dp
             cards.size > 12 -> 42.dp
             else -> 54.dp
         }
         val cardHeight = when {
-            tightLandscape && cards.size > 12 -> 48.dp
-            tightLandscape -> 70.dp
-            compact && cards.size > 12 -> 54.dp
-            landscape && cards.size > 12 -> 60.dp
-            compact -> 74.dp
-            landscape -> 80.dp
+            tightLandscape && cards.size > 12 -> 58.dp
+            tightLandscape -> 78.dp
+            compact && cards.size > 12 -> 62.dp
+            landscape && cards.size > 12 -> 68.dp
+            compact -> 84.dp
+            landscape -> 92.dp
             cards.size > 12 -> 66.dp
             else -> 84.dp
         }
@@ -1105,190 +1183,140 @@ private fun BattleActionStrip(
     compact: Boolean,
     landscape: Boolean,
     tightLandscape: Boolean,
-    showLabel: Boolean,
     modifier: Modifier = Modifier
 ) {
     if (!isBidTurn && !isPlayTurn) return
 
-    val shape = RoundedCornerShape(if (compact) 22.dp else 26.dp)
     val buttonHeight = when {
-        tightLandscape -> 28.dp
-        compact -> 34.dp
-        landscape -> 34.dp
-        else -> 36.dp
+        tightLandscape -> 42.dp
+        compact -> 46.dp
+        landscape -> 48.dp
+        else -> 46.dp
     }
     val narrowButtonWidth = when {
-        tightLandscape -> 48.dp
-        compact -> 58.dp
-        landscape -> 62.dp
-        else -> 68.dp
+        tightLandscape -> 62.dp
+        compact -> 70.dp
+        landscape -> 76.dp
+        else -> 70.dp
     }
     val wideButtonWidth = when {
-        tightLandscape -> 66.dp
-        compact -> 80.dp
-        landscape -> 84.dp
-        else -> 92.dp
+        tightLandscape -> 92.dp
+        compact -> 104.dp
+        landscape -> 116.dp
+        else -> 104.dp
+    }
+    val labelFontSize = when {
+        tightLandscape -> 20.sp
+        compact -> 22.sp
+        else -> 24.sp
     }
 
     Row(
         modifier = modifier
             .widthIn(max = when {
-                tightLandscape -> 352.dp
-                compact -> 448.dp
-                else -> 520.dp
-            })
-            .background(Color.Black.copy(alpha = 0.54f), shape)
-            .border(1.dp, Gold500.copy(alpha = 0.34f), shape)
-            .padding(
-                horizontal = when {
-                    tightLandscape -> 7.dp
-                    compact -> 9.dp
-                    else -> 12.dp
-                },
-                vertical = when {
-                    tightLandscape -> 5.dp
-                    compact -> 7.dp
-                    else -> 9.dp
-                }
-            ),
+                tightLandscape -> 520.dp
+                compact -> 620.dp
+                else -> 700.dp
+            }),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        ActionTimer(
-            compact = compact,
-            remainingSeconds = turnSecondsRemaining
+        horizontalArrangement = Arrangement.spacedBy(
+            when {
+                tightLandscape -> 8.dp
+                compact -> 10.dp
+                else -> 12.dp
+            },
+            Alignment.CenterHorizontally
         )
-
-        if (showLabel) {
-            Text(
-                text = if (isBidTurn) {
-                    if (currentBid > 0) "抢地主" else "叫地主"
-                } else {
-                    "轮到你出牌"
-                },
-                color = Gold500,
-                fontSize = when {
-                    tightLandscape -> 11.sp
-                    compact -> 13.sp
-                    else -> 15.sp
-                },
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
+    ) {
+        if (isBidTurn) {
+            PokerImageButton(
+                normalRes = R.drawable.btn_no_bid,
+                onClick = onBidPassClick,
+                soundType = null,
                 modifier = Modifier
-                    .padding(start = 8.dp, end = 8.dp)
-                    .width(
-                        when {
-                            tightLandscape -> 56.dp
-                            compact -> 70.dp
-                            else -> 94.dp
-                        }
-                    )
+                    .width(wideButtonWidth)
+                    .height(buttonHeight),
+                contentDescription = "不叫"
             )
-        } else {
-            Spacer(modifier = Modifier.width(8.dp))
-        }
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(
-                when {
-                    tightLandscape -> 4.dp
-                    compact -> 6.dp
-                    else -> 8.dp
-                }
-            ),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (isBidTurn) {
+            ActionTimer(
+                compact = compact,
+                remainingSeconds = turnSecondsRemaining
+            )
+
+            if (currentBid < 1) {
                 PokerImageButton(
-                    normalRes = R.drawable.btn_no_bid,
-                    onClick = onBidPassClick,
+                    text = "1分",
+                    onClick = { onBidClick(1) },
+                    normalRes = R.drawable.btn_blue,
                     soundType = null,
+                    fontSize = labelFontSize,
                     modifier = Modifier
-                        .width(wideButtonWidth)
-                        .height(buttonHeight),
-                    contentDescription = "不叫"
-                )
-
-                if (currentBid < 1) {
-                    PokerImageButton(
-                        text = "1分",
-                        onClick = { onBidClick(1) },
-                        normalRes = R.drawable.btn_green,
-                        soundType = null,
-                        fontSize = when {
-                            tightLandscape -> 11.sp
-                            compact -> 13.sp
-                            else -> 14.sp
-                        },
-                        modifier = Modifier
-                            .width(narrowButtonWidth)
-                            .height(buttonHeight)
-                    )
-                }
-
-                if (currentBid < 2) {
-                    PokerImageButton(
-                        text = "2分",
-                        onClick = { onBidClick(2) },
-                        normalRes = R.drawable.btn_orange,
-                        soundType = null,
-                        fontSize = when {
-                            tightLandscape -> 11.sp
-                            compact -> 13.sp
-                            else -> 14.sp
-                        },
-                        modifier = Modifier
-                            .width(narrowButtonWidth)
-                            .height(buttonHeight)
-                    )
-                }
-
-                if (currentBid < 3) {
-                    PokerImageButton(
-                        onClick = { onBidClick(3) },
-                        normalRes = if (currentBid > 0) R.drawable.text_grab else R.drawable.btn_bid,
-                        soundType = null,
-                        modifier = Modifier
-                            .width(wideButtonWidth)
-                            .height(buttonHeight),
-                        contentDescription = if (currentBid > 0) "抢地主" else "叫地主"
-                    )
-                }
-            } else {
-                PokerImageButton(
-                    text = "提示",
-                    onClick = onHintClick,
-                    normalRes = R.drawable.btn_orange,
-                    fontSize = when {
-                        tightLandscape -> 11.sp
-                        compact -> 13.sp
-                        else -> 14.sp
-                    },
-                    modifier = Modifier
-                        .width(if (compact) 68.dp else 76.dp)
+                        .width(narrowButtonWidth)
                         .height(buttonHeight)
                 )
+            }
 
+            if (currentBid < 2) {
                 PokerImageButton(
-                    onClick = onPassClick,
-                    normalRes = R.drawable.btn_pass,
+                    text = "2分",
+                    onClick = { onBidClick(2) },
+                    normalRes = R.drawable.btn_blue,
                     soundType = null,
+                    fontSize = labelFontSize,
                     modifier = Modifier
-                        .width(wideButtonWidth)
-                        .height(buttonHeight),
-                    contentDescription = "不出"
-                )
-
-                PokerImageButton(
-                    onClick = onPlayClick,
-                    normalRes = R.drawable.discard,
-                    soundType = null,
-                    modifier = Modifier
-                        .width(wideButtonWidth)
-                        .height(buttonHeight),
-                    contentDescription = "出牌"
+                        .width(narrowButtonWidth)
+                        .height(buttonHeight)
                 )
             }
+
+            if (currentBid < 3) {
+                PokerImageButton(
+                    onClick = { onBidClick(3) },
+                    normalRes = if (currentBid > 0) R.drawable.text_grab else R.drawable.btn_bid,
+                    soundType = null,
+                    modifier = Modifier
+                        .width(wideButtonWidth)
+                        .height(buttonHeight),
+                    contentDescription = if (currentBid > 0) "抢地主" else "叫地主"
+                )
+            }
+        } else {
+            PokerImageButton(
+                onClick = onPassClick,
+                normalRes = R.drawable.btn_pass,
+                soundType = null,
+                modifier = Modifier
+                    .width(wideButtonWidth)
+                    .height(buttonHeight),
+                contentDescription = "不出"
+            )
+
+            ActionTimer(
+                compact = compact,
+                remainingSeconds = turnSecondsRemaining
+            )
+
+            PokerImageButton(
+                text = "提示",
+                onClick = onHintClick,
+                normalRes = R.drawable.btn_blue,
+                soundType = null,
+                fontSize = labelFontSize,
+                modifier = Modifier
+                    .width(wideButtonWidth)
+                    .height(buttonHeight)
+            )
+
+            PokerImageButton(
+                onClick = onPlayClick,
+                normalRes = R.drawable.discard,
+                soundType = null,
+                modifier = Modifier
+                    .width(wideButtonWidth)
+                    .height(buttonHeight),
+                contentDescription = "出牌"
+            )
         }
     }
 }
@@ -1305,132 +1333,14 @@ private fun ActionTimer(
         Image(
             painter = painterResource(id = R.drawable.timer_bg),
             contentDescription = "计时",
-            modifier = Modifier.size(if (compact) 34.dp else 40.dp),
+            modifier = Modifier.size(if (compact) 48.dp else 54.dp),
             contentScale = ContentScale.Fit
         )
         Text(
             text = safeRemaining.toString(),
             color = timerColor,
-            fontSize = if (compact) 12.sp else 14.sp,
+            fontSize = if (compact) 18.sp else 20.sp,
             fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-@Composable
-private fun LocalPlayerDock(
-    player: PlayerUiState,
-    playerCards: List<GameCard>,
-    selectedCards: Set<String>,
-    avatarKey: String,
-    onCardClick: (GameCard) -> Unit,
-    compact: Boolean,
-    landscape: Boolean,
-    tightLandscape: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
-    val dockCardWidth = when {
-        tightLandscape -> 40.dp
-        compact -> 48.dp
-        landscape -> 54.dp
-        else -> 60.dp
-    }
-    val dockCardHeight = when {
-        tightLandscape -> 58.dp
-        compact -> 72.dp
-        landscape -> 78.dp
-        else -> 90.dp
-    }
-    val dockContainerHeight = when {
-        tightLandscape -> 76.dp
-        compact -> 94.dp
-        landscape -> 100.dp
-        else -> 118.dp
-    }
-    val dockMinStep = when {
-        tightLandscape -> 10.dp
-        compact -> 14.dp
-        landscape -> 16.dp
-        else -> 18.dp
-    }
-    val dockMaxStep = when {
-        tightLandscape -> 24.dp
-        compact -> 32.dp
-        landscape -> 34.dp
-        else -> 38.dp
-    }
-    val dockSelectedLift = when {
-        tightLandscape -> 8.dp
-        compact -> 12.dp
-        landscape -> 16.dp
-        else -> 20.dp
-    }
-
-    Row(
-        modifier = modifier
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color.Black.copy(alpha = 0.10f),
-                        Color.Black.copy(alpha = 0.46f)
-                    )
-                ),
-                shape
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.12f), shape)
-            .padding(
-                start = when {
-                    tightLandscape -> 4.dp
-                    compact -> 6.dp
-                    else -> 8.dp
-                },
-                top = when {
-                    tightLandscape -> 5.dp
-                    compact -> 7.dp
-                    else -> 8.dp
-                },
-                end = when {
-                    tightLandscape -> 4.dp
-                    compact -> 6.dp
-                    else -> 8.dp
-                },
-                bottom = when {
-                    tightLandscape -> 5.dp
-                    compact -> 7.dp
-                    else -> 8.dp
-                }
-            ),
-        verticalAlignment = Alignment.Bottom
-    ) {
-        LocalPlayerBadge(
-            player = player,
-            avatarKey = avatarKey,
-            compact = compact,
-            tightLandscape = tightLandscape,
-            modifier = Modifier.width(
-                when {
-                    tightLandscape -> 54.dp
-                    compact -> 66.dp
-                    landscape -> 70.dp
-                    else -> 78.dp
-                }
-            )
-        )
-
-        HandCards(
-            cards = playerCards,
-            selectedCards = selectedCards,
-            onCardClick = onCardClick,
-            cardWidth = dockCardWidth,
-            cardHeight = dockCardHeight,
-            containerHeight = dockContainerHeight,
-            minStep = dockMinStep,
-            maxStep = dockMaxStep,
-            selectedLift = dockSelectedLift,
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = if (compact) 2.dp else 4.dp)
         )
     }
 }
@@ -1443,9 +1353,10 @@ private fun LocalPlayerBadge(
     tightLandscape: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    Column(
-            modifier = modifier.padding(bottom = if (compact) 2.dp else 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(if (tightLandscape) 7.dp else 9.dp)
     ) {
         PlayerAvatar(
             avatarRes = avatarResourceForKey(avatarKey),
@@ -1454,24 +1365,79 @@ private fun LocalPlayerBadge(
             tightLandscape = tightLandscape,
             modifier = Modifier.size(
                 when {
-                    tightLandscape -> 36.dp
-                    compact -> 46.dp
-                    else -> 58.dp
+                    tightLandscape -> 58.dp
+                    compact -> 64.dp
+                    else -> 72.dp
                 }
             )
         )
+        Column(
+            modifier = Modifier.padding(bottom = if (compact) 2.dp else 4.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 3.dp else 4.dp)
+        ) {
+            PlayerLevelTag(compact = compact)
+            Text(
+                text = player.name,
+                color = TextWhite,
+                fontSize = when {
+                    tightLandscape -> 15.sp
+                    compact -> 17.sp
+                    else -> 19.sp
+                },
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = if (tightLandscape) 112.dp else 150.dp)
+            )
+            Text(
+                text = "豆  --",
+                color = Gold500,
+                fontSize = when {
+                    tightLandscape -> 13.sp
+                    compact -> 15.sp
+                    else -> 16.sp
+                },
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color.Black.copy(alpha = 0.26f))
+                    .padding(horizontal = 12.dp, vertical = 2.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun TableBottomStatus(
+    multiplier: Int,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(Color.Black.copy(alpha = 0.30f))
+            .padding(start = 6.dp, end = 18.dp, top = 3.dp, bottom = 3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(30.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFFFA629)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "倍",
+                color = TextWhite,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Black
+            )
+        }
         Text(
-            text = player.name,
-            color = TextWhite,
-            fontSize = when {
-                tightLandscape -> 9.sp
-                compact -> 11.sp
-                else -> 12.sp
-            },
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = if (compact) 3.dp else 4.dp)
+            text = "  $multiplier",
+            color = Gold500,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold
         )
     }
 }

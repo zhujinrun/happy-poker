@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -66,7 +66,6 @@ fun CreateRoomScreen(
             Column(modifier = Modifier.fillMaxSize()) {
                 PokerLobbyHeader(
                     title = "创建房间",
-                    subtitle = "设置牌局人数，邀请好友入座",
                     onBackClick = onBackClick
                 )
 
@@ -74,25 +73,28 @@ fun CreateRoomScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .weight(1f)
-                        .navigationBarsPadding()
-                        .padding(horizontal = 20.dp, vertical = if (compact) 4.dp else 8.dp),
+                        .padding(
+                            horizontal = if (compact) 30.dp else 42.dp,
+                            vertical = if (compact) 0.dp else 6.dp
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     PokerGlassPanel(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 540.dp),
+                            .offset(y = if (compact) (-12).dp else (-18).dp)
+                            .widthIn(max = 500.dp)
+                            .fillMaxWidth(),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 20.dp)
+                            verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 16.dp)
                         ) {
                             Text(
                                 text = "新牌局",
                                 color = Gold500,
-                                fontSize = if (compact) 20.sp else 24.sp,
+                                fontSize = if (compact) 18.sp else 22.sp,
                                 fontWeight = FontWeight.Bold
                             )
 
