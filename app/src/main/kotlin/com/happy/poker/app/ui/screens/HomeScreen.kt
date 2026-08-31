@@ -43,6 +43,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.happy.poker.app.R
+import com.happy.poker.app.progress.PlayerProgressManager
+import com.happy.poker.app.progress.formatBeanCount
 import com.happy.poker.app.settings.AppSettingsManager
 import com.happy.poker.app.sound.GameAudio
 import com.happy.poker.app.ui.components.PokerBlueTableBackground
@@ -61,8 +63,10 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val settingsManager = remember { AppSettingsManager(context) }
+    val progressManager = remember { PlayerProgressManager(context) }
     val nickname = settingsManager.getNickname()
     val avatarRes = homeAvatarResourceForKey(settingsManager.getAvatarKey())
+    val beanBalance = progressManager.getBeanBalance()
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val compactHeight = maxHeight < 430.dp
@@ -136,6 +140,7 @@ fun HomeScreen(
         LobbyUserDock(
             nickname = nickname,
             avatarRes = avatarRes,
+            beanBalance = beanBalance,
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(start = horizontalInset, bottom = if (compactHeight) 10.dp else 14.dp)
@@ -342,6 +347,7 @@ private fun LobbyMenuButton(
 private fun LobbyUserDock(
     nickname: String,
     avatarRes: Int,
+    beanBalance: Int,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -371,33 +377,19 @@ private fun LobbyUserDock(
 
         Column(
             modifier = Modifier.padding(bottom = 2.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "知府 I",
-                    color = TextWhite,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(Color(0xFF2D8B74).copy(alpha = 0.84f))
-                        .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(999.dp))
-                        .padding(horizontal = 13.dp, vertical = 3.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = nickname,
-                    color = TextWhite,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 150.dp)
-                )
-            }
             Text(
-                text = "豆  1.144万",
+                text = nickname,
+                color = TextWhite,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 150.dp)
+            )
+            Text(
+                text = "豆  ${formatBeanCount(beanBalance)}",
                 color = Gold500,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,

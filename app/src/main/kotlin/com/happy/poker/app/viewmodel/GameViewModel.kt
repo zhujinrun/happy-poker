@@ -10,6 +10,7 @@ import com.happy.poker.core.flow.GameFlow
 import com.happy.poker.core.flow.GameState
 import com.happy.poker.core.model.*
 import com.happy.poker.app.settings.AppSettingsManager
+import com.happy.poker.app.progress.PlayerProgressManager
 import com.happy.poker.app.sound.GameAudio
 import com.happy.poker.core.rules.Validator
 import com.happy.poker.app.effects.SpecialEffectsManager
@@ -35,7 +36,8 @@ data class PlayerUiState(
     val name: String,
     val role: PlayerRole = PlayerRole.Unknown,
     val handSize: Int = 0,
-    val isOnline: Boolean = true
+    val isOnline: Boolean = true,
+    val beanBalance: Int = PlayerProgressManager.INITIAL_BEAN_BALANCE
 )
 
 data class GameUiState(
@@ -63,7 +65,9 @@ data class GameResult(
     val winnerId: String,
     val winnerRole: PlayerRole,
     val scores: Map<String, Int>,
-    val multiplier: Int
+    val multiplier: Int,
+    val beanDelta: Int = 0,
+    val beanBalance: Int = 0
 )
 
 class GameViewModel(application: Application) : AndroidViewModel(application) {
@@ -74,12 +78,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private var gameFlow: GameFlow? = null
     private val humanPlayerId: String = "human_player"
     private var gameSessionId: Int = 0
+    private var currentGameSettlementKey: String = ""
+    private var settledGameKey: String? = null
     private var turnTimerJob: Job? = null
     private var turnTimerToken: Int = 0
     private var aiActionJob: Job? = null
     private var suppressFlowError: Boolean = false
     private val aiManager = AiManager()
     private val appSettingsManager = AppSettingsManager(application)
+    private val playerProgressManager = PlayerProgressManager(application)
     private val specialEffectsManager = SpecialEffectsManager()
     private val _specialEffectState = MutableStateFlow(SpecialEffectState(SpecialEffectType.Bomb))
     val specialEffectState: StateFlow<SpecialEffectState> = _specialEffectState.asStateFlow()
@@ -124,7 +131,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         name = p.name,
                         role = p.role,
                         handSize = p.handSize,
-                        isOnline = p.isOnline
+                        isOnline = p.isOnline,
+                        beanBalance = PlayerProgressManager.INITIAL_BEAN_BALANCE
                     )
                 },
                 roomState = newRoom.state
@@ -135,12 +143,21 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun startGame() {
         gameSessionId += 1
         val sessionId = gameSessionId
+        currentGameSettlementKey = "single-$sessionId-${System.currentTimeMillis()}"
+        settledGameKey = null
         val localName = appSettingsManager.getNickname()
         room?.findPlayer(humanPlayerId)?.name = localName
         updateUiState {
             it.copy(
                 players = it.players.map { player ->
-                    if (player.id == humanPlayerId) player.copy(name = localName) else player
+                    if (player.id == humanPlayerId) {
+                        player.copy(
+                            name = localName,
+                            beanBalance = PlayerProgressManager.INITIAL_BEAN_BALANCE
+                        )
+                    } else {
+                        player.copy(beanBalance = PlayerProgressManager.INITIAL_BEAN_BALANCE)
+                    }
                 }
             )
         }
@@ -781,6 +798,21 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 scores: Map<String, Int>,
                 multiplier: Int
             ) {
+                if (currentGameSettlementKey.isBlank() || settledGameKey == currentGameSettlementKey) {
+                    return
+                }
+                val humanScore = scores[humanPlayerId] ?: 0
+                val beanSettlement = playerProgressManager.settleGameResult(currentGameSettlementKey, humanScore)
+                settledGameKey = currentGameSettlementKey
+                val updatedPlayers = _uiState.value.players.map { player ->
+                    val scoreChange = scores[player.id] ?: 0
+                    val nextBalance = if (player.id == humanPlayerId) {
+                        beanSettlement.balance
+                    } else {
+                        (player.beanBalance + scoreChange).coerceAtLeast(0)
+                    }
+                    player.copy(beanBalance = nextBalance)
+                }
                 val humanSideWon = _uiState.value.players.find { it.id == humanPlayerId }?.role == winnerRole
                 if (humanSideWon) {
                     GameAudio.playWin()
@@ -789,6 +821,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 updateUiState {
                     it.copy(
+                        players = updatedPlayers,
                         roomState = RoomState.Finished,
                         isPlayTurn = false,
                         isBidTurn = false,
@@ -796,7 +829,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                             winnerId = winnerId,
                             winnerRole = winnerRole,
                             scores = scores,
-                            multiplier = multiplier
+                            multiplier = multiplier,
+                            beanDelta = beanSettlement.delta,
+                            beanBalance = beanSettlement.balance
                         )
                     )
                 }

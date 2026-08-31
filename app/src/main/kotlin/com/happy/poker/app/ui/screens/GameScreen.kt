@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.happy.poker.app.R
+import com.happy.poker.app.progress.PlayerProgressManager
+import com.happy.poker.app.progress.formatBeanCount
 import com.happy.poker.app.ui.components.*
 import com.happy.poker.app.settings.AppSettingsManager
 import com.happy.poker.app.sound.GameAudio
@@ -55,6 +57,8 @@ fun GameScreen(
     val specialEffectState by viewModel.specialEffectState.collectAsState()
     val context = LocalContext.current
     val appSettingsManager = remember { AppSettingsManager(context) }
+    val progressManager = remember { PlayerProgressManager(context) }
+    val beanBalance = progressManager.getBeanBalance()
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
     var visibleFeedbackId by remember { mutableStateOf(0) }
 
@@ -118,6 +122,8 @@ fun GameScreen(
                     )
                 },
                 multiplier = gameResult.multiplier,
+                beanDelta = gameResult.beanDelta,
+                beanBalance = gameResult.beanBalance,
                 onBackToHomeClick = onBackClick,
                 onPlayAgainClick = { viewModel.startGame() }
             )
@@ -141,6 +147,7 @@ fun GameScreen(
                 currentPlayerId = uiState.currentPlayerId,
                 lastPlayedCards = uiState.lastPlayedCards,
                 lastPlayedBy = uiState.lastPlayedBy,
+                beanBalance = beanBalance,
                 onBackClick = onBackClick,
                 humanAvatarKey = appSettingsManager.getAvatarKey()
             )
@@ -274,12 +281,20 @@ fun GameScreenContent(
     currentPlayerId: String? = null,
     lastPlayedCards: List<GameCard>? = null,
     lastPlayedBy: String? = null,
+    beanBalance: Int = PlayerProgressManager.INITIAL_BEAN_BALANCE,
     humanAvatarKey: String = AppSettingsManager.DEFAULT_AVATAR,
     onBackClick: () -> Unit = {}
 ) {
     val humanPlayer = players.find {
         it.id == "human_player" || it.id.startsWith("human_player_") || it.name == "我"
-    } ?: PlayerUiState("human_player", "我", PlayerRole.Unknown, playerCards.size)
+    } ?: PlayerUiState(
+        id = "human_player",
+        name = "我",
+        role = PlayerRole.Unknown,
+        handSize = playerCards.size,
+        beanBalance = beanBalance
+    )
+    val localBeanBalance = humanPlayer.beanBalance
     GameTable {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val compactHeight = maxHeight < 430.dp
@@ -397,7 +412,7 @@ fun GameScreenContent(
             }
 
             LocalPlayerBadge(
-                player = humanPlayer.copy(handSize = playerCards.size),
+                player = humanPlayer.copy(handSize = playerCards.size, beanBalance = localBeanBalance),
                 avatarKey = humanAvatarKey,
                 compact = compactHeight,
                 tightLandscape = tightLandscape,
@@ -429,6 +444,7 @@ fun GameScreenContent(
 
             TableBottomStatus(
                 multiplier = multiplier,
+                beanBalance = localBeanBalance,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .navigationBarsPadding()
@@ -815,7 +831,6 @@ private fun PlayerBadgeCard(
                     tightLandscape = tightLandscape,
                     modifier = Modifier.size(avatarSize)
                 )
-                PlayerLevelTag(compact = compact)
                 Text(
                     text = player.name,
                     color = TextWhite,
@@ -830,7 +845,7 @@ private fun PlayerBadgeCard(
                     modifier = Modifier.padding(top = 2.dp)
                 )
                 Text(
-                    text = "豆  --",
+                    text = "豆  ${formatBeanCount(player.beanBalance)}",
                     color = Gold500,
                     fontSize = when {
                         tightLandscape -> 9.sp
@@ -860,23 +875,6 @@ private fun PlayerBadgeCard(
             }
         }
     }
-}
-
-@Composable
-private fun PlayerLevelTag(compact: Boolean) {
-    Text(
-        text = "知府 I",
-        color = TextWhite,
-        fontSize = if (compact) 8.sp else 9.sp,
-        fontWeight = FontWeight.Bold,
-        maxLines = 1,
-        modifier = Modifier
-            .offset(y = (-2).dp)
-            .clip(RoundedCornerShape(999.dp))
-            .background(Color(0xFF2C8B74))
-            .border(1.dp, Color.White.copy(alpha = 0.45f), RoundedCornerShape(999.dp))
-            .padding(horizontal = 8.dp, vertical = 1.dp)
-    )
 }
 
 @Composable
@@ -1375,7 +1373,6 @@ private fun LocalPlayerBadge(
             modifier = Modifier.padding(bottom = if (compact) 2.dp else 4.dp),
             verticalArrangement = Arrangement.spacedBy(if (compact) 3.dp else 4.dp)
         ) {
-            PlayerLevelTag(compact = compact)
             Text(
                 text = player.name,
                 color = TextWhite,
@@ -1390,7 +1387,7 @@ private fun LocalPlayerBadge(
                 modifier = Modifier.widthIn(max = if (tightLandscape) 112.dp else 150.dp)
             )
             Text(
-                text = "豆  --",
+                text = "豆  ${formatBeanCount(player.beanBalance)}",
                 color = Gold500,
                 fontSize = when {
                     tightLandscape -> 13.sp
@@ -1410,34 +1407,24 @@ private fun LocalPlayerBadge(
 @Composable
 private fun TableBottomStatus(
     multiplier: Int,
+    beanBalance: Int,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(999.dp))
             .background(Color.Black.copy(alpha = 0.30f))
-            .padding(start = 6.dp, end = 18.dp, top = 3.dp, bottom = 3.dp),
+            .padding(horizontal = 6.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(30.dp)
-                .clip(CircleShape)
-                .background(Color(0xFFFFA629)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "倍",
-                color = TextWhite,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Black
-            )
-        }
-        Text(
-            text = "  $multiplier",
-            color = Gold500,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold
+        PokerStatusPill(
+            text = "豆 ${formatBeanCount(beanBalance)}",
+            color = Green600,
+            modifier = Modifier.padding(end = 6.dp)
+        )
+        PokerStatusPill(
+            text = "${multiplier}倍",
+            color = Gold500
         )
     }
 }

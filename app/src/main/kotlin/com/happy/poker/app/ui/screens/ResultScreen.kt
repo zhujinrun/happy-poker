@@ -24,6 +24,7 @@ import com.happy.poker.app.ui.components.PokerImageButton
 import com.happy.poker.app.ui.components.PokerLobbyHeader
 import com.happy.poker.app.ui.components.PokerScreenBackground
 import com.happy.poker.app.ui.components.PokerStatusPill
+import com.happy.poker.app.progress.formatBeanCount
 import com.happy.poker.app.ui.theme.*
 
 data class PlayerResult(
@@ -39,6 +40,8 @@ fun ResultScreen(
     isLandlordWin: Boolean = true,
     players: List<PlayerResult> = emptyList(),
     multiplier: Int = 1,
+    beanDelta: Int = 0,
+    beanBalance: Int = 0,
     onBackToHomeClick: () -> Unit = {},
     onPlayAgainClick: () -> Unit = {}
 ) {
@@ -54,7 +57,7 @@ fun ResultScreen(
                     title = "牌局结算",
                     onBackClick = onBackToHomeClick,
                     trailing = {
-                        PokerStatusPill(text = "${multiplier}倍", color = Gold500)
+                        PokerStatusPill(text = "豆 ${formatBeanCount(beanBalance)}", color = Green600)
                     }
                 )
 
@@ -81,6 +84,7 @@ fun ResultScreen(
                             winner = winner,
                             isLandlordWin = isLandlordWin,
                             multiplier = multiplier,
+                            beanDelta = beanDelta,
                             compactHeight = compactHeight,
                             modifier = Modifier
                                 .width(heroWidth)
@@ -118,6 +122,7 @@ private fun ResultHeroSection(
     winner: String,
     isLandlordWin: Boolean,
     multiplier: Int,
+    beanDelta: Int,
     compactHeight: Boolean,
     modifier: Modifier = Modifier
 ) {
@@ -160,6 +165,19 @@ private fun ResultHeroSection(
                 multiplier = multiplier,
                 compactHeight = compactHeight
             )
+
+            if (beanDelta != 0) {
+                Spacer(modifier = Modifier.height(if (compactHeight) 5.dp else 8.dp))
+                Text(
+                    text = if (beanDelta > 0) "本局豆子 +${beanDelta}" else "本局豆子 ${beanDelta}",
+                    color = if (beanDelta > 0) Green600 else ButtonDanger,
+                    fontSize = if (compactHeight) 13.sp else 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
@@ -334,7 +352,9 @@ fun ResultScreenPreview() {
             winner = "地主",
             isLandlordWin = true,
             players = samplePlayers,
-            multiplier = 3
+            multiplier = 3,
+            beanDelta = 18,
+            beanBalance = 1000
         )
     }
 }

@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.happy.poker.app.R
+import com.happy.poker.app.progress.PlayerProgressManager
 import com.happy.poker.app.ui.components.*
 import com.happy.poker.app.settings.AppSettingsManager
 import com.happy.poker.app.ui.theme.*
@@ -47,6 +48,9 @@ fun MultiplayerGameScreen(
     val specialEffectState by specialEffectsManager.effectState.collectAsState()
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
     var visibleFeedbackId by remember { mutableStateOf(0) }
+    val humanBeanBalance = uiState.room.players.find {
+        it.id == "human_player" || it.id.startsWith("human_player_") || it.name == "我"
+    }?.beanBalance ?: PlayerProgressManager.INITIAL_BEAN_BALANCE
 
     LaunchedEffect(uiState.feedbackId, uiState.feedbackMessage) {
         val message = uiState.feedbackMessage
@@ -105,6 +109,7 @@ fun MultiplayerGameScreen(
                 currentPlayerId = uiState.currentPlayerId,
                 lastPlayedBy = uiState.lastPlayedBy,
                 players = uiState.room.players,
+                beanBalance = humanBeanBalance,
                 humanAvatarKey = appSettingsManager.getAvatarKey(),
                 onBackClick = onBackClick
             )
@@ -134,6 +139,8 @@ fun MultiplayerGameScreen(
                             )
                         },
                         multiplier = result.multiplier,
+                        beanDelta = result.beanDelta,
+                        beanBalance = result.beanBalance,
                         onBackToHomeClick = onBackClick,
                         onPlayAgainClick = { viewModel.startGame() }
                     )
@@ -435,6 +442,7 @@ fun GameContent(
     currentPlayerId: String? = null,
     lastPlayedBy: String? = null,
     players: List<PlayerUiState> = emptyList(),
+    beanBalance: Int = PlayerProgressManager.INITIAL_BEAN_BALANCE,
     humanAvatarKey: String = AppSettingsManager.DEFAULT_AVATAR,
     onBackClick: () -> Unit = {}
 ) {
@@ -457,6 +465,7 @@ fun GameContent(
         currentPlayerId = currentPlayerId,
         lastPlayedCards = lastPlayedCards,
         lastPlayedBy = lastPlayedBy,
+        beanBalance = beanBalance,
         humanAvatarKey = humanAvatarKey,
         onBackClick = onBackClick
     )
