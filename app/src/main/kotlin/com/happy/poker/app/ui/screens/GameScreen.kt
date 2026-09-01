@@ -91,14 +91,6 @@ fun GameScreen(
     }
     
     Box(modifier = Modifier.fillMaxSize()) {
-        // 游戏背景图片
-        Image(
-            painter = painterResource(id = R.drawable.game_bg),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-        
         val gameResult = uiState.gameResult
         if (uiState.roomState == RoomState.Finished && gameResult != null) {
             val humanPlayer = uiState.players.find {
