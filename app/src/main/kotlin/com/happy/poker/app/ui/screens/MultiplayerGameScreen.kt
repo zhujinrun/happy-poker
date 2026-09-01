@@ -44,13 +44,18 @@ fun MultiplayerGameScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val appSettingsManager = remember { AppSettingsManager(context) }
+    val progressManager = remember { PlayerProgressManager(context) }
     val specialEffectsManager = remember { SpecialEffectsManager() }
     val specialEffectState by specialEffectsManager.effectState.collectAsState()
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
     var visibleFeedbackId by remember { mutableStateOf(0) }
-    val humanBeanBalance = uiState.room.players.find {
-        it.id == "human_player" || it.id.startsWith("human_player_") || it.name == "我"
-    }?.beanBalance ?: PlayerProgressManager.INITIAL_BEAN_BALANCE
+    val humanBeanBalance = progressManager.getBeanBalance()
+
+    DisposableEffect(viewModel) {
+        onDispose {
+            viewModel.cancelPendingGameEndReveal()
+        }
+    }
 
     LaunchedEffect(uiState.feedbackId, uiState.feedbackMessage) {
         val message = uiState.feedbackMessage

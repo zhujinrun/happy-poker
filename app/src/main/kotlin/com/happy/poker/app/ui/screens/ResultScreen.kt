@@ -22,9 +22,8 @@ import com.happy.poker.app.R
 import com.happy.poker.app.ui.components.PokerGlassPanel
 import com.happy.poker.app.ui.components.PokerImageButton
 import com.happy.poker.app.ui.components.PokerLobbyHeader
+import com.happy.poker.app.ui.components.BeanStatusPill
 import com.happy.poker.app.ui.components.PokerScreenBackground
-import com.happy.poker.app.ui.components.PokerStatusPill
-import com.happy.poker.app.progress.formatBeanCount
 import com.happy.poker.app.ui.theme.*
 
 data class PlayerResult(
@@ -57,7 +56,7 @@ fun ResultScreen(
                     title = "牌局结算",
                     onBackClick = onBackToHomeClick,
                     trailing = {
-                        PokerStatusPill(text = "豆 ${formatBeanCount(beanBalance)}", color = Green600)
+                        BeanStatusPill(beanBalance = beanBalance, compact = true)
                     }
                 )
 

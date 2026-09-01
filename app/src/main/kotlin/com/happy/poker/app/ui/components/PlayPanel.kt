@@ -145,22 +145,10 @@ fun GameInfo(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        // 倍数
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "倍数",
-                color = TextGray,
-                fontSize = 12.sp
-            )
-            Text(
-                text = "${multiplier}x",
-                color = Gold500,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
+        CounterStatusPlate(
+            label = "倍",
+            valueText = multiplier.toString()
+        )
         
         // 底牌数量
         Column(

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -44,12 +42,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.happy.poker.app.R
 import com.happy.poker.app.progress.PlayerProgressManager
-import com.happy.poker.app.progress.formatBeanCount
 import com.happy.poker.app.settings.AppSettingsManager
 import com.happy.poker.app.sound.GameAudio
 import com.happy.poker.app.ui.components.PokerBlueTableBackground
-import com.happy.poker.app.ui.components.PokerIconButton
-import com.happy.poker.app.ui.theme.Gold500
+import com.happy.poker.app.ui.components.BeanStatusPill
+import com.happy.poker.app.ui.components.CounterStatusPlate
+import com.happy.poker.app.ui.components.PokerBackButton
+import com.happy.poker.app.ui.components.PokerBackPlaceholder
+import com.happy.poker.app.ui.components.PokerSettingsButton
 import com.happy.poker.app.ui.theme.HappyPokerTheme
 import com.happy.poker.app.ui.theme.TextGray
 import com.happy.poker.app.ui.theme.TextWhite
@@ -179,24 +179,12 @@ private fun LobbyTopChrome(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (onBackClick != null) {
-                PokerIconButton(
-                    iconRes = R.drawable.poker_back_arrow,
+                PokerBackButton(
                     onClick = onBackClick,
-                    modifier = Modifier
-                        .width(34.dp)
-                        .height(48.dp),
-                    iconSize = 34.dp,
                     contentDescription = "退出"
                 )
             } else {
-                Image(
-                    painter = painterResource(id = R.drawable.poker_back_arrow),
-                    contentDescription = "返回占位",
-                    modifier = Modifier
-                        .width(34.dp)
-                        .height(48.dp),
-                    contentScale = ContentScale.Fit
-                )
+                PokerBackPlaceholder()
             }
         }
 
@@ -204,89 +192,10 @@ private fun LobbyTopChrome(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.Top
         ) {
-            LobbyFeatureButton(label = "设置", tone = TextWhite, onClick = onSettingsClick)
-            LobbyFeatureButton(label = "更多", tone = TextWhite, onClick = onSettingsClick)
-        }
-    }
-}
-
-@Composable
-private fun LobbyFeatureButton(
-    label: String,
-    tone: Color,
-    modifier: Modifier = Modifier,
-    badge: String? = null,
-    onClick: (() -> Unit)? = null
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val clickModifier = if (onClick != null) {
-        Modifier.clickable(
-            interactionSource = interactionSource,
-            indication = null,
-            onClick = {
-                GameAudio.buttonClick()
-                onClick()
-            }
-        )
-    } else {
-        Modifier
-    }
-
-    Box(
-        modifier = modifier
-            .then(clickModifier)
-            .graphicsLayer {
-                val pressedScale = if (isPressed) 0.95f else 1f
-                scaleX = pressedScale
-                scaleY = pressedScale
-            }
-            .width(54.dp),
-        contentAlignment = Alignment.TopCenter
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(
-                modifier = Modifier
-                    .size(30.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.White.copy(alpha = 0.18f))
-                    .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = label.take(1),
-                    color = tone,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Black
-                )
-            }
-            Text(
-                text = label,
-                color = tone,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+            PokerSettingsButton(
+                onClick = onSettingsClick,
+                contentDescription = "设置"
             )
-        }
-
-        if (badge != null) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = 3.dp, y = (-5).dp)
-                    .size(17.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFFF4E38)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = badge,
-                    color = TextWhite,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
         }
     }
 }
@@ -388,50 +297,18 @@ private fun LobbyUserDock(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.widthIn(max = 150.dp)
             )
-            Text(
-                text = "豆  ${formatBeanCount(beanBalance)}",
-                color = Gold500,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(Color.Black.copy(alpha = 0.26f))
-                    .padding(horizontal = 18.dp, vertical = 3.dp)
-            )
+            BeanStatusPill(beanBalance = beanBalance)
         }
     }
 }
 
 @Composable
 private fun LobbyBottomStatus(modifier: Modifier = Modifier) {
-    Row(
+    CounterStatusPlate(
+        label = "倍",
+        valueText = "0",
         modifier = modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(Color.Black.copy(alpha = 0.28f))
-            .padding(start = 8.dp, end = 24.dp, top = 4.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(30.dp)
-                .clip(CircleShape)
-                .background(Color(0xFFFFA629)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "倍",
-                color = TextWhite,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Black
-            )
-        }
-        Text(
-            text = "  0",
-            color = Gold500,
-            fontSize = 19.sp,
-            fontWeight = FontWeight.Bold
-        )
-    }
+    )
 }
 
 private fun homeAvatarResourceForKey(avatarKey: String): Int =

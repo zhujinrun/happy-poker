@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -62,7 +63,8 @@ private fun SplashScreen(onTimeout: () -> Unit) {
             painter = painterResource(id = R.drawable.splash_bg),
             contentDescription = "Splash",
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Crop,
+            alignment = BiasAlignment(horizontalBias = 0f, verticalBias = -0.4f)
         )
     }
 }

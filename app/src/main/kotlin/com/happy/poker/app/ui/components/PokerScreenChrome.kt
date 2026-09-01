@@ -5,13 +5,16 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,7 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.happy.poker.app.R
+import com.happy.poker.app.progress.formatBeanCount
 import com.happy.poker.app.ui.theme.CardBlack
 import com.happy.poker.app.ui.theme.Gold500
 import com.happy.poker.app.ui.theme.Green600
@@ -72,14 +75,10 @@ fun PokerLobbyHeader(
             .height(headerHeight)
             .padding(horizontal = 22.dp)
     ) {
-        PokerIconButton(
-            iconRes = R.drawable.poker_back_arrow,
+        PokerBackButton(
             onClick = onBackClick,
             modifier = Modifier
-                .align(Alignment.TopStart)
-                .width(34.dp)
-                .height(48.dp),
-            iconSize = 34.dp,
+                .align(Alignment.TopStart),
             contentDescription = "返回"
         )
 
@@ -168,6 +167,93 @@ fun PokerStatusPill(
             .background(color.copy(alpha = 0.92f))
             .padding(horizontal = 10.dp, vertical = 4.dp)
     )
+}
+
+@Composable
+fun BeanStatusPill(
+    beanBalance: Int,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false
+) {
+    CounterStatusPlate(
+        label = "豆",
+        valueText = formatBeanCount(beanBalance),
+        modifier = modifier,
+        compact = compact
+    )
+}
+
+@Composable
+fun BeanAmountText(
+    beanBalance: Int,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false
+) {
+    Text(
+        text = formatBeanCount(beanBalance),
+        color = Gold500,
+        fontSize = if (compact) 11.sp else 16.sp,
+        lineHeight = if (compact) 13.sp else 18.sp,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(Color.Black.copy(alpha = 0.26f))
+            .padding(
+                horizontal = if (compact) 6.dp else 12.dp,
+                vertical = if (compact) 0.dp else 2.dp
+            )
+    )
+}
+
+@Composable
+fun CounterStatusPlate(
+    label: String,
+    valueText: String,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false
+) {
+    val shape = RoundedCornerShape(999.dp)
+    val badgeSize = if (compact) 24.dp else 30.dp
+    val labelFontSize = if (compact) 12.sp else 16.sp
+    val valueFontSize = if (compact) 14.sp else 19.sp
+    Row(
+        modifier = modifier
+            .clip(shape)
+            .background(Color.Black.copy(alpha = 0.28f))
+            .padding(
+                start = if (compact) 6.dp else 8.dp,
+                end = if (compact) 10.dp else 14.dp,
+                top = if (compact) 2.dp else 4.dp,
+                bottom = if (compact) 2.dp else 4.dp
+            ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(badgeSize)
+                .clip(CircleShape)
+                .background(Color(0xFFFFA629)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label,
+                color = TextWhite,
+                fontSize = labelFontSize,
+                fontWeight = FontWeight.Black,
+                maxLines = 1
+            )
+        }
+        Text(
+            text = "  $valueText",
+            color = Gold500,
+            fontSize = valueFontSize,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }
 
 @Composable

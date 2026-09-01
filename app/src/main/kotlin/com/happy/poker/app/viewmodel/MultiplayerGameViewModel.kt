@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 private const val TURN_TIMEOUT_SECONDS = 30
+private const val GAME_END_REVEAL_DELAY_MS = 1200L
 
 private enum class MultiplayerTurnPhase {
     Bidding,
@@ -76,10 +77,19 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     private val playerProgressManager = PlayerProgressManager(application)
     private var turnTimerJob: Job? = null
     private var turnTimerToken: Int = 0
+    private var gameEndRevealJob: Job? = null
 
     init {
         reconnectManager.init(viewModelScope) { reconnect() }
         connectToBroker()
+    }
+
+    private fun beanBalanceForPlayer(playerId: String, existing: PlayerUiState? = null): Int {
+        return if (playerId == humanPlayerId) {
+            playerProgressManager.getBeanBalance()
+        } else {
+            existing?.beanBalance ?: PlayerProgressManager.INITIAL_BEAN_BALANCE
+        }
     }
 
     private fun connectToBroker() {
@@ -177,6 +187,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     fun leaveRoom() {
         viewModelScope.launch {
             stopHumanTurnTimer()
+            cancelPendingGameEndReveal()
             val message = RoomLeaveMessage(
                 roomId = currentRoomId,
                 playerId = humanPlayerId
@@ -201,6 +212,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
 
     fun startGame() {
         viewModelScope.launch {
+            cancelPendingGameEndReveal()
             val message = GameStartMessage(
                 roomId = currentRoomId,
                 players = _uiState.value.room.players.map { p ->
@@ -218,6 +230,8 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun selectCard(cardId: String) {
+        if (!_uiState.value.isPlayTurn) return
+
         val currentSelected = _uiState.value.selectedCards.toMutableSet()
         if (cardId in currentSelected) {
             currentSelected.remove(cardId)
@@ -353,6 +367,11 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
+    fun cancelPendingGameEndReveal() {
+        gameEndRevealJob?.cancel()
+        gameEndRevealJob = null
+    }
+
     private fun handleRoomCreated(message: RoomCreatedMessage) {
         currentRoomId = message.roomId
         updateUiState {
@@ -367,7 +386,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                             PlayerRole.Unknown,
                             0,
                             true,
-                            PlayerProgressManager.INITIAL_BEAN_BALANCE
+                            beanBalanceForPlayer(humanPlayerId)
                         )
                     ),
                     maxPlayers = currentRoomMaxPlayers,
@@ -408,7 +427,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                             role = existing?.role ?: PlayerRole.Unknown,
                             handSize = existing?.handSize ?: 0,
                             isOnline = p.isOnline,
-                            beanBalance = existing?.beanBalance ?: PlayerProgressManager.INITIAL_BEAN_BALANCE
+                            beanBalance = beanBalanceForPlayer(p.id, existing)
                         )
                     }
                 ),
@@ -447,7 +466,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                             role = existing?.role ?: PlayerRole.Unknown,
                             handSize = existing?.handSize ?: 0,
                             isOnline = p.isOnline,
-                            beanBalance = existing?.beanBalance ?: PlayerProgressManager.INITIAL_BEAN_BALANCE
+                            beanBalance = beanBalanceForPlayer(p.id, existing)
                         )
                     },
                     state = message.state,
@@ -472,16 +491,26 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
         currentRoomId = message.roomId
         currentGameSettlementKey = "multi-${message.roomId}-${message.timestamp}"
         settledGameKey = null
+        cancelPendingGameEndReveal()
         stopHumanTurnTimer()
         updateUiState {
-            val resetPlayers = it.room.players.map { player ->
-                player.copy(beanBalance = PlayerProgressManager.INITIAL_BEAN_BALANCE)
+            val existingPlayersById = it.room.players.associateBy { player -> player.id }
+            val nextPlayers = message.players.map { playerInfo ->
+                val existing = existingPlayersById[playerInfo.id]
+                PlayerUiState(
+                    id = playerInfo.id,
+                    name = playerInfo.name,
+                    role = existing?.role ?: PlayerRole.Unknown,
+                    handSize = existing?.handSize ?: 0,
+                    isOnline = playerInfo.isOnline,
+                    beanBalance = beanBalanceForPlayer(playerInfo.id, existing)
+                )
             }
             it.copy(
                 bottomCards = message.bottomCards.map { it.toCard() },
                 room = it.room.copy(
                     state = RoomState.Bidding,
-                    players = resetPlayers
+                    players = nextPlayers
                 ),
                 currentPlayerId = null,
                 currentBid = 0,
@@ -576,7 +605,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                             role = ps.role,
                             handSize = ps.handSize,
                             isOnline = ps.isOnline,
-                            beanBalance = existing?.beanBalance ?: PlayerProgressManager.INITIAL_BEAN_BALANCE
+                            beanBalance = beanBalanceForPlayer(ps.id, existing)
                         )
                     }
                 ),
@@ -626,25 +655,29 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
         } else {
             GameAudio.playLose()
         }
-        updateUiState {
-            it.copy(
-                room = it.room.copy(
-                    state = RoomState.Finished,
-                    players = updatedPlayers
-                ),
-                isPlayTurn = false,
-                isBidTurn = false,
-                currentPlayerId = null,
-                gameResult = GameResult(
-                    winnerId = message.winnerId,
-                    winnerRole = message.winnerRole,
-                    scores = message.scores,
-                    multiplier = message.multiplier,
-                    beanDelta = beanSettlement.delta,
-                    beanBalance = beanSettlement.balance
-                ),
-                turnSecondsRemaining = TURN_TIMEOUT_SECONDS
-            )
+        cancelPendingGameEndReveal()
+        gameEndRevealJob = viewModelScope.launch {
+            delay(GAME_END_REVEAL_DELAY_MS)
+            updateUiState {
+                it.copy(
+                    room = it.room.copy(
+                        state = RoomState.Finished,
+                        players = updatedPlayers
+                    ),
+                    isPlayTurn = false,
+                    isBidTurn = false,
+                    currentPlayerId = null,
+                    gameResult = GameResult(
+                        winnerId = message.winnerId,
+                        winnerRole = message.winnerRole,
+                        scores = message.scores,
+                        multiplier = message.multiplier,
+                        beanDelta = beanSettlement.delta,
+                        beanBalance = beanSettlement.balance
+                    ),
+                    turnSecondsRemaining = TURN_TIMEOUT_SECONDS
+                )
+            }
         }
     }
 

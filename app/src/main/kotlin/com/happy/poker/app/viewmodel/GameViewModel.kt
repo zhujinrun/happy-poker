@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 
 private const val TURN_TIMEOUT_SECONDS = 30
 private const val AI_PLAY_REVEAL_DELAY_MS = 1600L
+private const val GAME_END_REVEAL_DELAY_MS = 1200L
 
 private enum class HumanTurnPhase {
     Bidding,
@@ -83,6 +84,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private var turnTimerJob: Job? = null
     private var turnTimerToken: Int = 0
     private var aiActionJob: Job? = null
+    private var gameEndRevealJob: Job? = null
     private var suppressFlowError: Boolean = false
     private val aiManager = AiManager()
     private val appSettingsManager = AppSettingsManager(application)
@@ -98,6 +100,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun updateSpecialEffectState() {
         val currentState = specialEffectsManager.effectState.value
         _specialEffectState.value = currentState
+    }
+
+    private fun beanBalanceForPlayer(playerId: String, existing: PlayerUiState? = null): Int {
+        return if (playerId == humanPlayerId) {
+            playerProgressManager.getBeanBalance()
+        } else {
+            existing?.beanBalance ?: PlayerProgressManager.INITIAL_BEAN_BALANCE
+        }
     }
 
     private fun initializeGame() {
@@ -132,7 +142,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         role = p.role,
                         handSize = p.handSize,
                         isOnline = p.isOnline,
-                        beanBalance = PlayerProgressManager.INITIAL_BEAN_BALANCE
+                        beanBalance = beanBalanceForPlayer(p.id)
                     )
                 },
                 roomState = newRoom.state
@@ -145,6 +155,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val sessionId = gameSessionId
         currentGameSettlementKey = "single-$sessionId-${System.currentTimeMillis()}"
         settledGameKey = null
+        cancelPendingGameEndReveal()
         val localName = appSettingsManager.getNickname()
         room?.findPlayer(humanPlayerId)?.name = localName
         updateUiState {
@@ -153,10 +164,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     if (player.id == humanPlayerId) {
                         player.copy(
                             name = localName,
-                            beanBalance = PlayerProgressManager.INITIAL_BEAN_BALANCE
+                            beanBalance = playerProgressManager.getBeanBalance()
                         )
                     } else {
-                        player.copy(beanBalance = PlayerProgressManager.INITIAL_BEAN_BALANCE)
+                        player
                     }
                 }
             )
@@ -195,6 +206,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectCard(cardId: String) {
+        if (!_uiState.value.isPlayTurn) return
+
         val currentSelected = _uiState.value.selectedCards.toMutableSet()
         if (cardId in currentSelected) {
             currentSelected.remove(cardId)
@@ -356,6 +369,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 feedbackId = it.feedbackId + 1
             )
         }
+    }
+
+    fun cancelPendingGameEndReveal() {
+        gameEndRevealJob?.cancel()
+        gameEndRevealJob = null
     }
 
     private fun startHumanTurnTimer(phase: HumanTurnPhase) {
@@ -589,14 +607,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun syncGameState(gameState: GameState) {
         updateUiState { state ->
+            val existingPlayersById = state.players.associateBy { it.id }
             state.copy(
                 players = gameState.players.map { ps ->
+                    val existing = existingPlayersById[ps.id]
                     PlayerUiState(
                         id = ps.id,
                         name = ps.name,
                         role = ps.role,
                         handSize = ps.handSize,
-                        isOnline = ps.isOnline
+                        isOnline = ps.isOnline,
+                        beanBalance = beanBalanceForPlayer(ps.id, existing)
                     )
                 },
                 currentPlayerId = gameState.currentPlayerId,
@@ -801,6 +822,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 if (currentGameSettlementKey.isBlank() || settledGameKey == currentGameSettlementKey) {
                     return
                 }
+                val sessionId = gameSessionId
                 val humanScore = scores[humanPlayerId] ?: 0
                 val beanSettlement = playerProgressManager.settleGameResult(currentGameSettlementKey, humanScore)
                 settledGameKey = currentGameSettlementKey
@@ -819,23 +841,30 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     GameAudio.playLose()
                 }
-                updateUiState {
-                    it.copy(
-                        players = updatedPlayers,
-                        roomState = RoomState.Finished,
-                        isPlayTurn = false,
-                        isBidTurn = false,
-                        gameResult = GameResult(
-                            winnerId = winnerId,
-                            winnerRole = winnerRole,
-                            scores = scores,
-                            multiplier = multiplier,
-                            beanDelta = beanSettlement.delta,
-                            beanBalance = beanSettlement.balance
-                        )
-                    )
-                }
                 stopHumanTurnTimer()
+                aiActionJob?.cancel()
+                aiActionJob = null
+                cancelPendingGameEndReveal()
+                gameEndRevealJob = viewModelScope.launch {
+                    delay(GAME_END_REVEAL_DELAY_MS)
+                    if (sessionId != gameSessionId) return@launch
+                    updateUiState {
+                        it.copy(
+                            players = updatedPlayers,
+                            roomState = RoomState.Finished,
+                            isPlayTurn = false,
+                            isBidTurn = false,
+                            gameResult = GameResult(
+                                winnerId = winnerId,
+                                winnerRole = winnerRole,
+                                scores = scores,
+                                multiplier = multiplier,
+                                beanDelta = beanSettlement.delta,
+                                beanBalance = beanSettlement.balance
+                            )
+                        )
+                    }
+                }
             }
 
             override fun onError(message: String) {

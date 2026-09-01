@@ -50,12 +50,14 @@ import com.happy.poker.app.ui.theme.TextGray
 import com.happy.poker.app.ui.theme.TextWhite
 import com.happy.poker.core.model.Room
 
+private const val DEFAULT_ROOM_NAME = "欢乐房间"
+
 @Composable
 fun CreateRoomScreen(
     onBackClick: () -> Unit = {},
     onCreateClick: (String, Int) -> Unit = { _, _ -> }
 ) {
-    var roomName by remember { mutableStateOf("") }
+    var roomName by remember { mutableStateOf(DEFAULT_ROOM_NAME) }
     var maxPlayers by remember { mutableIntStateOf(3) }
     val canCreate = roomName.isNotBlank()
 
@@ -102,7 +104,7 @@ fun CreateRoomScreen(
                                 value = roomName,
                                 onValueChange = { roomName = it.take(18) },
                                 label = { Text("房间名称") },
-                                placeholder = { Text("例如：欢乐房间") },
+                                placeholder = { Text(DEFAULT_ROOM_NAME) },
                                 singleLine = true,
                                 textStyle = TextStyle(
                                     color = TextWhite,

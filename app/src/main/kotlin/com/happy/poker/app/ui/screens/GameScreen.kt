@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.happy.poker.app.R
 import com.happy.poker.app.progress.PlayerProgressManager
-import com.happy.poker.app.progress.formatBeanCount
 import com.happy.poker.app.ui.components.*
 import com.happy.poker.app.settings.AppSettingsManager
 import com.happy.poker.app.sound.GameAudio
@@ -61,6 +60,12 @@ fun GameScreen(
     val beanBalance = progressManager.getBeanBalance()
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
     var visibleFeedbackId by remember { mutableStateOf(0) }
+
+    DisposableEffect(viewModel) {
+        onDispose {
+            viewModel.cancelPendingGameEndReveal()
+        }
+    }
 
     LaunchedEffect(Unit) {
         if (uiState.roomState != RoomState.Bidding && uiState.roomState != RoomState.Playing) {
@@ -285,16 +290,21 @@ fun GameScreenContent(
     humanAvatarKey: String = AppSettingsManager.DEFAULT_AVATAR,
     onBackClick: () -> Unit = {}
 ) {
-    val humanPlayer = players.find {
+    val isLocalHumanPlayer: (PlayerUiState) -> Boolean = {
         it.id == "human_player" || it.id.startsWith("human_player_") || it.name == "我"
-    } ?: PlayerUiState(
+    }
+    val humanPlayer = players.find(isLocalHumanPlayer) ?: PlayerUiState(
         id = "human_player",
         name = "我",
         role = PlayerRole.Unknown,
         handSize = playerCards.size,
         beanBalance = beanBalance
     )
-    val localBeanBalance = humanPlayer.beanBalance
+    val localBeanBalance = if (isLocalHumanPlayer(humanPlayer)) {
+        beanBalance
+    } else {
+        humanPlayer.beanBalance
+    }
     GameTable {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val compactHeight = maxHeight < 430.dp
@@ -363,6 +373,7 @@ fun GameScreenContent(
 
             OpponentStrip(
                 players = players,
+                humanPlayerId = humanPlayer.id,
                 currentPlayerId = currentPlayerId,
                 compact = compactHeight,
                 tightLandscape = tightLandscape,
@@ -371,7 +382,7 @@ fun GameScreenContent(
                     .fillMaxWidth()
                     .padding(horizontal = sideInset)
                     .offset(y = opponentOffsetY)
-                    .zIndex(3f)
+                    .zIndex(12f)
             )
 
             CenterPlayedArea(
@@ -418,9 +429,8 @@ fun GameScreenContent(
                 tightLandscape = tightLandscape,
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .navigationBarsPadding()
-                    .padding(start = sideInset, bottom = if (tightLandscape) 6.dp else 9.dp)
-                    .zIndex(9f)
+                    .padding(start = sideInset, bottom = if (compactHeight) 10.dp else 14.dp)
+                    .zIndex(12f)
             )
 
             HandCards(
@@ -444,11 +454,9 @@ fun GameScreenContent(
 
             TableBottomStatus(
                 multiplier = multiplier,
-                beanBalance = localBeanBalance,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .navigationBarsPadding()
-                    .padding(end = sideInset, bottom = if (tightLandscape) 8.dp else 12.dp)
+                    .padding(end = sideInset, bottom = if (compactHeight) 12.dp else 18.dp)
                     .zIndex(9f)
             )
         }
@@ -485,11 +493,7 @@ private fun PokerTopHud(
         ) {
             PokerNavChip(
                 text = "返回",
-                onClick = onBackClick,
-                tightLandscape = tightLandscape,
-                modifier = Modifier
-                    .width(if (tightLandscape) 38.dp else 44.dp)
-                    .height(if (tightLandscape) 46.dp else 52.dp)
+                onClick = onBackClick
             )
         }
 
@@ -511,15 +515,12 @@ private fun PokerTopHud(
 private fun PokerNavChip(
     text: String,
     onClick: () -> Unit,
-    tightLandscape: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    PokerIconButton(
-        iconRes = R.drawable.poker_back_arrow,
+    PokerBackButton(
+        onClick = onClick,
         contentDescription = text,
-        modifier = modifier,
-        iconSize = if (tightLandscape) 30.dp else 36.dp,
-        onClick = onClick
+        modifier = modifier
     )
 }
 
@@ -621,56 +622,12 @@ private fun TopBidStatus(
     tightLandscape: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val valueText = "x${currentBid.takeIf { it > 0 } ?: "-"}"
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(Color.Black.copy(alpha = 0.30f))
-            .padding(
-                start = if (tightLandscape) 4.dp else 5.dp,
-                end = if (tightLandscape) 9.dp else 12.dp,
-                top = if (tightLandscape) 2.dp else 3.dp,
-                bottom = if (tightLandscape) 2.dp else 3.dp
-            ),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(
-                    when {
-                        tightLandscape -> 24.dp
-                        compact -> 26.dp
-                        else -> 28.dp
-                    }
-                )
-                .clip(CircleShape)
-                .background(Color(0xFFFFA629)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "叫",
-                color = TextWhite,
-                fontSize = when {
-                    tightLandscape -> 12.sp
-                    compact -> 13.sp
-                    else -> 14.sp
-                },
-                fontWeight = FontWeight.Black
-            )
-        }
-
-        Text(
-            text = "  $valueText",
-            color = Gold500,
-            fontSize = when {
-                tightLandscape -> 14.sp
-                compact -> 15.sp
-                else -> 16.sp
-            },
-            fontWeight = FontWeight.Bold,
-            maxLines = 1
-        )
-    }
+    CounterStatusPlate(
+        label = "叫",
+        valueText = currentBid.takeIf { it > 0 }?.toString() ?: "-",
+        modifier = modifier,
+        compact = compact || tightLandscape
+    )
 }
 
 @Composable
@@ -734,13 +691,20 @@ private fun MiniCardBack(
 @Composable
 private fun OpponentStrip(
     players: List<PlayerUiState>,
+    humanPlayerId: String,
     currentPlayerId: String?,
     compact: Boolean,
     tightLandscape: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val leftPlayer = players.getOrNull(1)
-    val rightPlayer = players.getOrNull(2)
+    val humanIndex = players.indexOfFirst { it.id == humanPlayerId }
+    val seatedPlayers = if (humanIndex >= 0) {
+        players.drop(humanIndex) + players.take(humanIndex)
+    } else {
+        players
+    }
+    val leftPlayer = seatedPlayers.getOrNull(1)
+    val rightPlayer = seatedPlayers.getOrNull(2)
     val badgeWidth = when {
         tightLandscape -> 126.dp
         compact -> 144.dp
@@ -815,57 +779,68 @@ private fun PlayerBadgeCard(
                 CardCountPlate(player.handSize, compact = compact, modifier = Modifier.padding(end = 6.dp))
             }
 
-            Column(
+            Box(
                 modifier = Modifier
                     .width(if (tightLandscape) 78.dp else 92.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(Color(0xFF101A36).copy(alpha = if (isCurrentPlayer) 0.68f else 0.48f))
-                    .border(1.dp, borderColor, RoundedCornerShape(18.dp))
-                    .padding(horizontal = 5.dp, vertical = if (tightLandscape) 5.dp else 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .zIndex(if (player.role == PlayerRole.Landlord) 20f else 0f),
+                contentAlignment = Alignment.TopCenter
             ) {
-                PlayerAvatar(
-                    avatarRes = avatarRes,
-                    role = player.role,
-                    compact = compact,
-                    tightLandscape = tightLandscape,
-                    modifier = Modifier.size(avatarSize)
-                )
-                Text(
-                    text = player.name,
-                    color = TextWhite,
-                    fontSize = when {
-                        tightLandscape -> 10.sp
-                        compact -> 11.sp
-                        else -> 12.sp
-                    },
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-                Text(
-                    text = "豆  ${formatBeanCount(player.beanBalance)}",
-                    color = Gold500,
-                    fontSize = when {
-                        tightLandscape -> 9.sp
-                        compact -> 10.sp
-                        else -> 11.sp
-                    },
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-                if (!player.isOnline) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xFF101A36).copy(alpha = if (isCurrentPlayer) 0.68f else 0.48f))
+                        .border(1.dp, borderColor, RoundedCornerShape(18.dp))
+                        .padding(horizontal = 5.dp, vertical = if (tightLandscape) 5.dp else 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    PlayerAvatar(
+                        avatarRes = avatarRes,
+                        role = player.role,
+                        compact = compact,
+                        tightLandscape = tightLandscape,
+                        modifier = Modifier.size(avatarSize)
+                    )
                     Text(
-                        text = "离线",
-                        color = ButtonDanger,
+                        text = player.name,
+                        color = TextWhite,
                         fontSize = when {
-                            tightLandscape -> 8.sp
-                            compact -> 9.sp
-                            else -> 10.sp
-                        }
+                            tightLandscape -> 10.sp
+                            compact -> 11.sp
+                            else -> 12.sp
+                        },
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                    BeanAmountText(
+                        beanBalance = player.beanBalance,
+                        modifier = Modifier
+                            .padding(top = 0.dp)
+                            .offset(y = (-2).dp),
+                        compact = true
+                    )
+                    if (!player.isOnline) {
+                        Text(
+                            text = "离线",
+                            color = ButtonDanger,
+                            fontSize = when {
+                                tightLandscape -> 8.sp
+                                compact -> 9.sp
+                                else -> 10.sp
+                            }
+                        )
+                    }
+                }
+
+                if (player.role == PlayerRole.Landlord) {
+                    LandlordHatOverlay(
+                        compact = compact,
+                        tightLandscape = tightLandscape,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .zIndex(30f)
                     )
                 }
             }
@@ -909,6 +884,33 @@ private fun CardCountPlate(
 }
 
 @Composable
+private fun LandlordHatOverlay(
+    compact: Boolean,
+    tightLandscape: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val hatSize = when {
+        tightLandscape -> 26.dp
+        compact -> 28.dp
+        else -> 32.dp
+    }
+    val hatOffsetY = when {
+        tightLandscape -> (-12).dp
+        compact -> (-14).dp
+        else -> (-17).dp
+    }
+
+    Image(
+        painter = painterResource(id = R.drawable.landlord_hat_icon),
+        contentDescription = "地主",
+        modifier = modifier
+            .size(hatSize)
+            .offset(y = hatOffsetY),
+        contentScale = ContentScale.Fit
+    )
+}
+
+@Composable
 private fun PlayerAvatar(
     avatarRes: Int,
     role: PlayerRole,
@@ -936,61 +938,35 @@ private fun PlayerAvatar(
         compact -> 2.dp
         else -> 4.dp
     }
-    val landlordHatSize = when {
-        tightLandscape -> 26.dp
-        compact -> 28.dp
-        else -> 32.dp
-    }
-    val landlordHatOffsetY = when {
-        tightLandscape -> (-2).dp
-        compact -> (-3).dp
-        else -> (-4).dp
-    }
 
-    Box(modifier = modifier) {
-        Box(
+    Box(
+        modifier = modifier
+            .clip(CircleShape)
+            .background(Color(0xFF1E3D2B))
+            .border(if (compact) 2.dp else 3.dp, ringColor.copy(alpha = 0.92f), CircleShape),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        Image(
+            painter = painterResource(id = avatarRes),
+            contentDescription = "玩家头像",
             modifier = Modifier
-                .fillMaxSize()
-                .clip(CircleShape)
-                .background(Color(0xFF1E3D2B))
-                .border(if (compact) 2.dp else 3.dp, ringColor.copy(alpha = 0.92f), CircleShape),
-            contentAlignment = Alignment.TopCenter
-        ) {
-            Image(
-                painter = painterResource(id = avatarRes),
-                contentDescription = "玩家头像",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(
-                        when {
-                            tightLandscape -> 104.dp
-                            compact -> 122.dp
-                            else -> 154.dp
-                        }
-                    )
-                    .offset(y = avatarYOffset)
-                    .graphicsLayer {
-                        scaleX = avatarZoom
-                        scaleY = avatarZoom
-                        transformOrigin = TransformOrigin(0.5f, 0f)
-                    },
-                alignment = Alignment.TopCenter,
-                contentScale = ContentScale.FillWidth
-            )
-        }
-
-        if (role == PlayerRole.Landlord) {
-            Image(
-                painter = painterResource(id = R.drawable.landlord_hat_icon),
-                contentDescription = "地主",
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .size(landlordHatSize)
-                    .offset(y = landlordHatOffsetY)
-                    .zIndex(2f),
-                contentScale = ContentScale.Fit
-            )
-        }
+                .fillMaxWidth()
+                .height(
+                    when {
+                        tightLandscape -> 104.dp
+                        compact -> 122.dp
+                        else -> 154.dp
+                    }
+                )
+                .offset(y = avatarYOffset)
+                .graphicsLayer {
+                    scaleX = avatarZoom
+                    scaleY = avatarZoom
+                    transformOrigin = TransformOrigin(0.5f, 0f)
+                },
+            alignment = Alignment.TopCenter,
+            contentScale = ContentScale.FillWidth
+        )
     }
 }
 
@@ -1351,24 +1327,41 @@ private fun LocalPlayerBadge(
     tightLandscape: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val avatarSize = when {
+        tightLandscape -> 58.dp
+        compact -> 64.dp
+        else -> 72.dp
+    }
+
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.spacedBy(if (tightLandscape) 7.dp else 9.dp)
     ) {
-        PlayerAvatar(
-            avatarRes = avatarResourceForKey(avatarKey),
-            role = player.role,
-            compact = compact,
-            tightLandscape = tightLandscape,
-            modifier = Modifier.size(
-                when {
-                    tightLandscape -> 58.dp
-                    compact -> 64.dp
-                    else -> 72.dp
-                }
+        Box(
+            modifier = Modifier
+                .size(avatarSize)
+                .zIndex(if (player.role == PlayerRole.Landlord) 20f else 0f),
+            contentAlignment = Alignment.TopCenter
+        ) {
+            PlayerAvatar(
+                avatarRes = avatarResourceForKey(avatarKey),
+                role = player.role,
+                compact = compact,
+                tightLandscape = tightLandscape,
+                modifier = Modifier.matchParentSize()
             )
-        )
+
+            if (player.role == PlayerRole.Landlord) {
+                LandlordHatOverlay(
+                    compact = compact,
+                    tightLandscape = tightLandscape,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .zIndex(30f)
+                )
+            }
+        }
         Column(
             modifier = Modifier.padding(bottom = if (compact) 2.dp else 4.dp),
             verticalArrangement = Arrangement.spacedBy(if (compact) 3.dp else 4.dp)
@@ -1386,20 +1379,7 @@ private fun LocalPlayerBadge(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.widthIn(max = if (tightLandscape) 112.dp else 150.dp)
             )
-            Text(
-                text = "豆  ${formatBeanCount(player.beanBalance)}",
-                color = Gold500,
-                fontSize = when {
-                    tightLandscape -> 13.sp
-                    compact -> 15.sp
-                    else -> 16.sp
-                },
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(Color.Black.copy(alpha = 0.26f))
-                    .padding(horizontal = 12.dp, vertical = 2.dp)
-            )
+            BeanStatusPill(beanBalance = player.beanBalance)
         }
     }
 }
@@ -1407,26 +1387,13 @@ private fun LocalPlayerBadge(
 @Composable
 private fun TableBottomStatus(
     multiplier: Int,
-    beanBalance: Int,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    CounterStatusPlate(
+        label = "倍",
+        valueText = multiplier.toString(),
         modifier = modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(Color.Black.copy(alpha = 0.30f))
-            .padding(horizontal = 6.dp, vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        PokerStatusPill(
-            text = "豆 ${formatBeanCount(beanBalance)}",
-            color = Green600,
-            modifier = Modifier.padding(end = 6.dp)
-        )
-        PokerStatusPill(
-            text = "${multiplier}倍",
-            color = Gold500
-        )
-    }
+    )
 }
 
 private fun avatarResourceForKey(avatarKey: String): Int =

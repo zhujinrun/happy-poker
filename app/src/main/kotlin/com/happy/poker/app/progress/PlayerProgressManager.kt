@@ -22,6 +22,7 @@ class PlayerProgressManager(context: Context) {
         private const val KEY_BEAN_BALANCE = "bean_balance"
         private const val KEY_LAST_SETTLED_GAME_KEY = "last_settled_game_key"
         private const val KEY_BEAN_MIGRATION_DONE = "bean_migration_done"
+        private const val KEY_BEAN_BASELINE_REFRESH_DONE = "bean_baseline_refresh_done"
         private const val LEGACY_PLACEHOLDER_BEAN_BALANCE = 11440
         const val INITIAL_BEAN_BALANCE = 1000
         private const val DEFAULT_BEAN_BALANCE = INITIAL_BEAN_BALANCE
@@ -30,10 +31,12 @@ class PlayerProgressManager(context: Context) {
 
     init {
         migrateLegacyBeanBalanceIfNeeded()
+        refreshBaselineBeanBalanceIfNeeded()
     }
 
     fun getBeanBalance(): Int {
         migrateLegacyBeanBalanceIfNeeded()
+        refreshBaselineBeanBalanceIfNeeded()
         return prefs.getInt(KEY_BEAN_BALANCE, DEFAULT_BEAN_BALANCE)
     }
 
@@ -67,6 +70,7 @@ class PlayerProgressManager(context: Context) {
             .putInt(KEY_BEAN_BALANCE, balance.coerceAtLeast(MIN_BEAN_BALANCE))
             .remove(KEY_LAST_SETTLED_GAME_KEY)
             .putBoolean(KEY_BEAN_MIGRATION_DONE, true)
+            .putBoolean(KEY_BEAN_BASELINE_REFRESH_DONE, true)
             .apply()
     }
 
@@ -89,6 +93,24 @@ class PlayerProgressManager(context: Context) {
         prefs.edit()
             .putBoolean(KEY_BEAN_MIGRATION_DONE, true)
             .apply()
+    }
+
+    private fun refreshBaselineBeanBalanceIfNeeded() {
+        if (prefs.getBoolean(KEY_BEAN_BASELINE_REFRESH_DONE, false)) return
+
+        val currentBalance = prefs.getInt(KEY_BEAN_BALANCE, DEFAULT_BEAN_BALANCE)
+        val hasSettlementHistory = !prefs.getString(KEY_LAST_SETTLED_GAME_KEY, null).isNullOrBlank()
+        val editor = prefs.edit()
+            .putBoolean(KEY_BEAN_BASELINE_REFRESH_DONE, true)
+
+        if (currentBalance == LEGACY_PLACEHOLDER_BEAN_BALANCE && !hasSettlementHistory) {
+            editor
+                .putInt(KEY_BEAN_BALANCE, INITIAL_BEAN_BALANCE)
+                .remove(KEY_LAST_SETTLED_GAME_KEY)
+                .putBoolean(KEY_BEAN_MIGRATION_DONE, true)
+        }
+
+        editor.apply()
     }
 }
 
