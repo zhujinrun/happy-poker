@@ -166,7 +166,8 @@ data class RoomStateMessage(
     val roomName: String,
     val players: List<PlayerInfo>,
     val state: RoomState,
-    val hostId: String
+    val hostId: String,
+    val maxPlayers: Int = 3
 ) : Message {
     override val type: MessageType = MessageType.ROOM_STATE
     override val timestamp: Long = System.currentTimeMillis()

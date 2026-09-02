@@ -21,6 +21,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -55,11 +56,31 @@ private const val DEFAULT_ROOM_NAME = "欢乐房间"
 @Composable
 fun CreateRoomScreen(
     onBackClick: () -> Unit = {},
+    feedbackMessage: String? = null,
+    feedbackId: Int = 0,
+    onFeedbackDismiss: () -> Unit = {},
     onCreateClick: (String, Int) -> Unit = { _, _ -> }
 ) {
     var roomName by remember { mutableStateOf(DEFAULT_ROOM_NAME) }
     var maxPlayers by remember { mutableIntStateOf(3) }
+    var localFeedbackMessage by remember { mutableStateOf<String?>(null) }
+    var visibleFeedbackId by remember { mutableIntStateOf(0) }
     val canCreate = roomName.isNotBlank()
+
+    LaunchedEffect(feedbackId, feedbackMessage) {
+        if (feedbackMessage.isNullOrBlank()) {
+            localFeedbackMessage = null
+            return@LaunchedEffect
+        }
+
+        localFeedbackMessage = feedbackMessage
+        visibleFeedbackId = feedbackId
+        kotlinx.coroutines.delay(1800)
+        if (visibleFeedbackId == feedbackId) {
+            localFeedbackMessage = null
+            onFeedbackDismiss()
+        }
+    }
 
     PokerScreenBackground {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -176,6 +197,13 @@ fun CreateRoomScreen(
                     }
                 }
             }
+
+            GameFeedbackToast(
+                message = localFeedbackMessage,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(y = if (compact) 78.dp else 96.dp)
+            )
         }
     }
 }

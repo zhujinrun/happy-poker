@@ -19,9 +19,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.util.UUID
 
 private const val TURN_TIMEOUT_SECONDS = 30
 private const val GAME_END_REVEAL_DELAY_MS = 1200L
+private const val ROOM_BROADCAST_INTERVAL_MS = 2500L
+private const val ROOM_STALE_TIMEOUT_MS = 9000L
 
 private enum class MultiplayerTurnPhase {
     Bidding,
@@ -40,6 +45,7 @@ data class RoomUiState(
 
 data class MultiplayerGameUiState(
     val room: RoomUiState = RoomUiState(),
+    val availableRooms: List<RoomInfo> = emptyList(),
     val playerCards: List<Card> = emptyList(),
     val selectedCards: Set<String> = emptySet(),
     val bottomCards: List<Card> = emptyList(),
@@ -78,10 +84,23 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     private var turnTimerJob: Job? = null
     private var turnTimerToken: Int = 0
     private var gameEndRevealJob: Job? = null
+    private var messageHandlerJob: Job? = null
+    private var roomBroadcastJob: Job? = null
+    private val discoveredRoomLastSeen = mutableMapOf<String, Long>()
+    private val connectionMutex = Mutex()
 
     init {
         reconnectManager.init(viewModelScope) { reconnect() }
-        connectToBroker()
+    }
+
+    private fun reconnect() {
+        viewModelScope.launch {
+            ensureBrokerConnected(
+                actionName = "重新连接服务器",
+                connectingState = ConnectionState.RECONNECTING,
+                notifyFailure = false
+            )
+        }
     }
 
     private fun beanBalanceForPlayer(playerId: String, existing: PlayerUiState? = null): Int {
@@ -92,141 +111,441 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
-    private fun connectToBroker() {
-        viewModelScope.launch {
-            try {
-                updateUiState { it.copy(connectionState = ConnectionState.CONNECTING) }
-                val config = mqttConfigManager.getMqttConnectionConfig()
-                mqttClient.connect(config)
-                reconnectManager.onConnected()
-                updateUiState { it.copy(isConnected = true, connectionState = ConnectionState.CONNECTED) }
-                setupMessageHandlers()
-            } catch (e: Exception) {
-                reconnectManager.onError(e)
-                updateUiState { it.copy(connectionState = ConnectionState.ERROR) }
-                showFeedback("连接服务器失败: ${e.message}")
+    private suspend fun ensureBrokerConnected(
+        actionName: String,
+        connectingState: ConnectionState = ConnectionState.CONNECTING,
+        notifyFailure: Boolean = true
+    ): Boolean = connectionMutex.withLock {
+        if (mqttClient.isConnected()) {
+            reconnectManager.onConnected()
+            updateUiState {
+                it.copy(
+                    isConnected = true,
+                    isSearching = false,
+                    connectionState = ConnectionState.CONNECTED
+                )
             }
+            subscribeDefaultTopics()
+            setupMessageHandlers()
+            return@withLock true
+        }
+
+        val config = mqttConfigManager.getMqttConnectionConfig()
+        updateUiState {
+            it.copy(
+                isConnected = false,
+                connectionState = connectingState
+            )
+        }
+
+        try {
+            mqttClient.connect(config)
+            reconnectManager.onConnected()
+            updateUiState {
+                it.copy(
+                    isConnected = true,
+                    isSearching = false,
+                    connectionState = ConnectionState.CONNECTED
+                )
+            }
+            subscribeDefaultTopics()
+            setupMessageHandlers()
+            true
+        } catch (e: Exception) {
+            reconnectManager.onError(e)
+            updateUiState {
+                it.copy(
+                    isConnected = false,
+                    isSearching = false,
+                    connectionState = ConnectionState.ERROR
+                )
+            }
+            if (notifyFailure) {
+                showFeedback("${actionName}失败：无法连接 ${config.brokerUrl}，${formatConnectionError(e)}")
+            }
+            false
         }
     }
 
-    private fun reconnect() {
-        viewModelScope.launch {
-            try {
-                updateUiState { it.copy(connectionState = ConnectionState.RECONNECTING) }
-                val config = mqttConfigManager.getMqttConnectionConfig()
-                mqttClient.connect(config)
-                reconnectManager.onConnected()
-                updateUiState { it.copy(isConnected = true, connectionState = ConnectionState.CONNECTED) }
-                setupMessageHandlers()
-            } catch (e: Exception) {
-                reconnectManager.onError(e)
-                updateUiState { 
-                    it.copy(
-                        connectionState = ConnectionState.ERROR
-                    ) 
-                }
-            }
-        }
+    private fun subscribeDefaultTopics() {
+        mqttClient.subscribe("${Protocol.TOPIC_PREFIX}/#")
     }
 
     private fun setupMessageHandlers() {
-        viewModelScope.launch {
+        if (messageHandlerJob?.isActive == true) {
+            return
+        }
+        messageHandlerJob?.cancel()
+        messageHandlerJob = viewModelScope.launch {
             mqttClient.incomingMessages.collect { message ->
-                when (message) {
-                    is RoomCreatedMessage -> handleRoomCreated(message)
-                    is RoomJoinedMessage -> handleRoomJoined(message)
-                    is RoomStateMessage -> handleRoomState(message)
-                    is GameStartMessage -> handleGameStarted(message)
-                    is GameBidResultMessage -> handleBidResult(message)
-                    is GamePlayResultMessage -> handlePlayResult(message)
-                    is GameStateMessage -> handleGameStateUpdate(message)
-                    is GameEndMessage -> handleGameEnded(message)
-                    is ErrorMessage -> handleError(message)
-                    else -> {}
+                try {
+                    when (message) {
+                        is RoomCreateMessage -> {}
+                        is RoomJoinMessage -> handleRoomJoinRequest(message)
+                        is RoomLeaveMessage -> handleRoomLeaveRequest(message)
+                        is RoomListMessage -> handleRoomListRequest()
+                        is RoomListResponseMessage -> handleRoomListResponse(message)
+                        is RoomCreatedMessage -> handleRoomCreated(message)
+                        is RoomJoinedMessage -> handleRoomJoined(message)
+                        is RoomStateMessage -> handleRoomState(message)
+                        is GameStartMessage -> handleGameStarted(message)
+                        is GameBidResultMessage -> handleBidResult(message)
+                        is GamePlayResultMessage -> handlePlayResult(message)
+                        is GameStateMessage -> handleGameStateUpdate(message)
+                        is GameEndMessage -> handleGameEnded(message)
+                        is ErrorMessage -> handleError(message)
+                        else -> {}
+                    }
+                } catch (e: Exception) {
+                    showFeedback("处理联机消息失败：${e.message ?: "数据异常"}")
                 }
             }
         }
     }
 
-    fun createRoom(roomName: String, maxPlayers: Int) {
+    suspend fun createRoom(roomName: String, maxPlayers: Int): Boolean {
         if (maxPlayers !in Room.SUPPORTED_PLAYER_COUNTS) {
             showFeedback("当前只支持2人或3人房间")
-            return
+            return false
+        }
+        if (!ensureBrokerConnected("创建房间")) {
+            return false
         }
 
-        viewModelScope.launch {
-            currentRoomMaxPlayers = maxPlayers
-            updateUiState { it.copy(isSearching = true) }
-            val message = RoomCreateMessage(
-                playerName = appSettingsManager.getNickname(),
-                playerId = humanPlayerId,
-                maxPlayers = maxPlayers
+        val displayRoomName = roomName.ifBlank { "欢乐房间" }
+        val roomId = createLocalRoomId()
+        currentRoomId = roomId
+        currentRoomMaxPlayers = maxPlayers
+        updateUiState {
+            it.copy(
+                isSearching = false,
+                room = RoomUiState(
+                    roomId = roomId,
+                    roomName = displayRoomName,
+                    players = listOf(
+                        PlayerUiState(
+                            id = humanPlayerId,
+                            name = appSettingsManager.getNickname(),
+                            role = PlayerRole.Unknown,
+                            handSize = 0,
+                            isOnline = true,
+                            beanBalance = beanBalanceForPlayer(humanPlayerId)
+                        )
+                    ),
+                    maxPlayers = maxPlayers,
+                    state = RoomState.Waiting,
+                    isHost = true,
+                    hostId = humanPlayerId
+                )
             )
-            mqttClient.sendMessage(Protocol.TOPIC_ROOM_CREATE, message)
         }
+        startRoomBroadcast()
+        val created = broadcastCurrentRoomState("创建房间", notifyFailure = true)
+        if (!created) {
+            stopRoomBroadcast()
+            currentRoomId = ""
+            currentRoomMaxPlayers = 3
+            updateUiState { it.copy(room = RoomUiState(), isSearching = false) }
+        }
+        return created
     }
 
-    fun joinRoom(roomId: String, maxPlayers: Int = 3) {
+    suspend fun joinRoom(roomId: String, maxPlayers: Int = 3, roomName: String = "欢乐房间"): Boolean {
         if (maxPlayers !in Room.SUPPORTED_PLAYER_COUNTS) {
             showFeedback("当前只支持2人或3人房间")
-            return
+            return false
+        }
+        if (!ensureBrokerConnected("加入房间")) {
+            return false
         }
 
-        viewModelScope.launch {
-            currentRoomMaxPlayers = maxPlayers
-            updateUiState { it.copy(isSearching = true) }
-            val message = RoomJoinMessage(
-                roomId = roomId,
-                playerName = appSettingsManager.getNickname(),
-                playerId = humanPlayerId
+        currentRoomId = roomId
+        currentRoomMaxPlayers = maxPlayers
+        updateUiState {
+            it.copy(
+                isSearching = true,
+                room = RoomUiState(
+                    roomId = roomId,
+                    roomName = roomName.ifBlank { "欢乐房间" },
+                    players = listOf(
+                        PlayerUiState(
+                            id = humanPlayerId,
+                            name = appSettingsManager.getNickname(),
+                            role = PlayerRole.Unknown,
+                            handSize = 0,
+                            isOnline = true,
+                            beanBalance = beanBalanceForPlayer(humanPlayerId)
+                        )
+                    ),
+                    maxPlayers = maxPlayers,
+                    state = RoomState.Waiting,
+                    isHost = false
+                )
             )
-            mqttClient.sendMessage(Protocol.TOPIC_ROOM_JOIN, message)
         }
+        val message = RoomJoinMessage(
+            roomId = roomId,
+            playerName = appSettingsManager.getNickname(),
+            playerId = humanPlayerId
+        )
+        val joined = sendOnlineMessageNow(Protocol.TOPIC_ROOM_JOIN, message, "加入房间", ensureConnection = false)
+        if (!joined) {
+            currentRoomId = ""
+            currentRoomMaxPlayers = 3
+            updateUiState { it.copy(room = RoomUiState(), isSearching = false) }
+        }
+        return joined
     }
 
     fun leaveRoom() {
+        stopHumanTurnTimer()
+        cancelPendingGameEndReveal()
+        stopRoomBroadcast()
+        val roomId = currentRoomId
+        if (roomId.isNotBlank()) {
+            val room = _uiState.value.room
+            if (room.isHost) {
+                sendOnlineMessage(
+                    Protocol.TOPIC_ROOM_UPDATE,
+                    buildRoomStateMessage(room, RoomState.Finished),
+                    "关闭房间",
+                    notifyFailure = false
+                )
+            } else {
+                val message = RoomLeaveMessage(
+                    roomId = roomId,
+                    playerId = humanPlayerId
+                )
+                sendOnlineMessage(Protocol.TOPIC_ROOM_LEAVE, message, "退出房间")
+            }
+        }
+        resetCurrentRoomPreservingLobby()
+    }
+
+    private fun sendOnlineMessage(
+        topic: String,
+        message: Message,
+        actionName: String,
+        notifyFailure: Boolean = true
+    ) {
         viewModelScope.launch {
-            stopHumanTurnTimer()
-            cancelPendingGameEndReveal()
-            val message = RoomLeaveMessage(
-                roomId = currentRoomId,
-                playerId = humanPlayerId
+            sendOnlineMessageNow(topic, message, actionName, notifyFailure = notifyFailure)
+        }
+    }
+
+    private suspend fun sendOnlineMessageNow(
+        topic: String,
+        message: Message,
+        actionName: String,
+        ensureConnection: Boolean = true,
+        notifyFailure: Boolean = true
+    ): Boolean {
+        if (ensureConnection && !ensureBrokerConnected(actionName, notifyFailure = notifyFailure)) {
+            return false
+        }
+
+        return try {
+            mqttClient.sendMessage(topic, message)
+            true
+        } catch (e: Exception) {
+            handleOnlineActionFailure(actionName, e, notifyFailure)
+            false
+        }
+    }
+
+    private fun handleOnlineActionFailure(actionName: String, error: Throwable, notifyFailure: Boolean = true) {
+        updateUiState {
+            it.copy(
+                isConnected = mqttClient.isConnected(),
+                isSearching = false,
+                connectionState = currentConnectionState()
             )
-            mqttClient.sendMessage(Protocol.TOPIC_ROOM_LEAVE, message)
-            currentRoomId = ""
-            currentRoomMaxPlayers = 3
-            updateUiState { MultiplayerGameUiState() }
+        }
+        if (!notifyFailure) return
+
+        val reason = error.message?.takeIf { it.isNotBlank() } ?: "请检查网络配置"
+        showFeedback("${actionName}失败：$reason")
+    }
+
+    private fun formatConnectionError(error: Throwable): String {
+        return error.message
+            ?.takeIf { it.isNotBlank() }
+            ?: "请确认手机和服务器在同一局域网"
+    }
+
+    private fun createLocalRoomId(): String {
+        return "room-${System.currentTimeMillis().toString(36)}-${UUID.randomUUID().toString().take(4)}"
+    }
+
+    private fun playerInfoFromUi(player: PlayerUiState): PlayerInfo {
+        return PlayerInfo(
+            id = player.id,
+            name = player.name,
+            isAI = false,
+            isOnline = player.isOnline,
+            isReady = false
+        )
+    }
+
+    private fun buildRoomStateMessage(room: RoomUiState, stateOverride: RoomState = room.state): RoomStateMessage {
+        return RoomStateMessage(
+            roomId = room.roomId,
+            roomName = room.roomName,
+            players = room.players.map(::playerInfoFromUi),
+            state = stateOverride,
+            hostId = room.hostId,
+            maxPlayers = room.maxPlayers
+        )
+    }
+
+    private suspend fun broadcastCurrentRoomState(
+        actionName: String = "同步房间",
+        notifyFailure: Boolean = false
+    ): Boolean {
+        val room = _uiState.value.room
+        if (room.roomId.isBlank()) return false
+
+        return sendOnlineMessageNow(
+            topic = Protocol.TOPIC_ROOM_UPDATE,
+            message = buildRoomStateMessage(room),
+            actionName = actionName,
+            notifyFailure = notifyFailure
+        )
+    }
+
+    private fun startRoomBroadcast() {
+        if (roomBroadcastJob?.isActive == true) return
+
+        roomBroadcastJob = viewModelScope.launch {
+            while (true) {
+                broadcastCurrentRoomState(notifyFailure = false)
+                delay(ROOM_BROADCAST_INTERVAL_MS)
+            }
+        }
+    }
+
+    private fun stopRoomBroadcast() {
+        roomBroadcastJob?.cancel()
+        roomBroadcastJob = null
+    }
+
+    private fun updateDiscoveredRoom(message: RoomStateMessage) {
+        val roomInfo = RoomInfo(
+            id = message.roomId,
+            name = message.roomName,
+            hostId = message.hostId,
+            playerCount = message.players.size,
+            maxPlayers = message.maxPlayers,
+            state = message.state
+        )
+
+        val now = System.currentTimeMillis()
+        discoveredRoomLastSeen[message.roomId] = now
+        updateUiState { state ->
+            val activeRooms = state.availableRooms
+                .filter { room ->
+                    room.id != message.roomId &&
+                        now - (discoveredRoomLastSeen[room.id] ?: now) <= ROOM_STALE_TIMEOUT_MS
+                }
+            val shouldShow = message.hostId != humanPlayerId &&
+                message.state == RoomState.Waiting &&
+                message.players.size < message.maxPlayers
+            state.copy(
+                availableRooms = (if (shouldShow) activeRooms + roomInfo else activeRooms)
+                    .sortedWith(compareBy<RoomInfo> { it.name }.thenBy { it.id })
+            )
+        }
+    }
+
+    private fun pruneStaleRooms() {
+        val now = System.currentTimeMillis()
+        updateUiState { state ->
+            state.copy(
+                availableRooms = state.availableRooms.filter { room ->
+                    now - (discoveredRoomLastSeen[room.id] ?: now) <= ROOM_STALE_TIMEOUT_MS
+                }
+            )
+        }
+    }
+
+    private fun resetCurrentRoomPreservingLobby() {
+        currentRoomId = ""
+        currentRoomMaxPlayers = 3
+        updateUiState { state ->
+            MultiplayerGameUiState(
+                availableRooms = state.availableRooms,
+                isConnected = mqttClient.isConnected(),
+                connectionState = currentConnectionState()
+            )
+        }
+    }
+
+    private fun handleRoomListResponse(message: RoomListResponseMessage) {
+        val now = System.currentTimeMillis()
+        val visibleRooms = message.rooms.filter { room ->
+            room.hostId != humanPlayerId &&
+                room.state == RoomState.Waiting &&
+                room.playerCount < room.maxPlayers
+        }
+        visibleRooms.forEach { room -> discoveredRoomLastSeen[room.id] = now }
+
+        updateUiState { state ->
+            val responseIds = visibleRooms.map { it.id }.toSet()
+            state.copy(
+                availableRooms = (state.availableRooms.filterNot { it.id in responseIds } + visibleRooms)
+                    .sortedWith(compareBy<RoomInfo> { it.name }.thenBy { it.id })
+            )
+        }
+    }
+
+    private fun isCurrentRoom(roomId: String): Boolean {
+        return currentRoomId.isNotBlank() && currentRoomId == roomId
+    }
+
+    private fun currentConnectionState(): ConnectionState {
+        return when (mqttClient.getConnectionState()) {
+            com.happy.poker.core.network.ConnectionState.DISCONNECTED -> ConnectionState.DISCONNECTED
+            com.happy.poker.core.network.ConnectionState.CONNECTING -> ConnectionState.CONNECTING
+            com.happy.poker.core.network.ConnectionState.CONNECTED -> ConnectionState.CONNECTED
+            com.happy.poker.core.network.ConnectionState.RECONNECTING -> ConnectionState.RECONNECTING
+            com.happy.poker.core.network.ConnectionState.ERROR -> ConnectionState.ERROR
         }
     }
 
     fun setReady(isReady: Boolean) {
-        viewModelScope.launch {
-            val message = PlayerReadyMessage(
-                roomId = currentRoomId,
-                playerId = humanPlayerId,
-                isReady = isReady
-            )
-            mqttClient.sendMessage(Protocol.TOPIC_PLAYER_READY, message)
-        }
+        val message = PlayerReadyMessage(
+            roomId = currentRoomId,
+            playerId = humanPlayerId,
+            isReady = isReady
+        )
+        sendOnlineMessage(Protocol.TOPIC_PLAYER_READY, message, "准备")
     }
 
     fun startGame() {
-        viewModelScope.launch {
-            cancelPendingGameEndReveal()
-            val message = GameStartMessage(
-                roomId = currentRoomId,
-                players = _uiState.value.room.players.map { p ->
-                    PlayerInfo(
-                        id = p.id,
-                        name = p.name,
-                        isAI = false,
-                        isOnline = true
-                    )
-                },
-                bottomCards = emptyList()
+        cancelPendingGameEndReveal()
+        val room = _uiState.value.room
+        if (room.isHost && room.roomId.isNotBlank()) {
+            stopRoomBroadcast()
+            sendOnlineMessage(
+                Protocol.TOPIC_ROOM_UPDATE,
+                buildRoomStateMessage(room, RoomState.Playing),
+                "同步房间",
+                notifyFailure = false
             )
-            mqttClient.sendMessage(Protocol.TOPIC_GAME_START, message)
         }
+        val message = GameStartMessage(
+            roomId = currentRoomId,
+            players = _uiState.value.room.players.map { p ->
+                PlayerInfo(
+                    id = p.id,
+                    name = p.name,
+                    isAI = false,
+                    isOnline = true
+                )
+            },
+            bottomCards = emptyList()
+        )
+        sendOnlineMessage(Protocol.TOPIC_GAME_START, message, "开始游戏")
     }
 
     fun selectCard(cardId: String) {
@@ -259,14 +578,12 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
             return
         }
 
-        viewModelScope.launch {
-            val message = GamePlayMessage(
-                roomId = currentRoomId,
-                playerId = humanPlayerId,
-                cards = selectedCards.map { CardInfo.fromCard(it) }
-            )
-            mqttClient.sendMessage(Protocol.TOPIC_GAME_PLAY, message)
-        }
+        val message = GamePlayMessage(
+            roomId = currentRoomId,
+            playerId = humanPlayerId,
+            cards = selectedCards.map { CardInfo.fromCard(it) }
+        )
+        sendOnlineMessage(Protocol.TOPIC_GAME_PLAY, message, "出牌")
     }
 
     fun pass() {
@@ -278,27 +595,23 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
             return
         }
 
-        viewModelScope.launch {
-            val message = GamePassMessage(
-                roomId = currentRoomId,
-                playerId = humanPlayerId
-            )
-            mqttClient.sendMessage(Protocol.TOPIC_GAME_PASS, message)
-        }
+        val message = GamePassMessage(
+            roomId = currentRoomId,
+            playerId = humanPlayerId
+        )
+        sendOnlineMessage(Protocol.TOPIC_GAME_PASS, message, "不出")
     }
 
     fun bid(bid: Int) {
         val state = _uiState.value
         if (!state.isBidTurn) return
 
-        viewModelScope.launch {
-            val message = GameBidMessage(
-                roomId = currentRoomId,
-                playerId = humanPlayerId,
-                bid = bid
-            )
-            mqttClient.sendMessage(Protocol.TOPIC_GAME_BID, message)
-        }
+        val message = GameBidMessage(
+            roomId = currentRoomId,
+            playerId = humanPlayerId,
+            bid = bid
+        )
+        sendOnlineMessage(Protocol.TOPIC_GAME_BID, message, "叫分")
     }
 
     fun bidPass() {
@@ -342,11 +655,10 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
         GameAudio.cardSelect()
     }
 
-    fun refreshRoomList() {
-        viewModelScope.launch {
-            val message = RoomListMessage()
-            mqttClient.sendMessage(Protocol.TOPIC_ROOM_LIST, message)
-        }
+    fun refreshRoomList(notifyFailure: Boolean = false) {
+        pruneStaleRooms()
+        val message = RoomListMessage()
+        sendOnlineMessage(Protocol.TOPIC_ROOM_LIST, message, "刷新房间", notifyFailure = notifyFailure)
     }
 
     fun clearError() {
@@ -370,6 +682,60 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     fun cancelPendingGameEndReveal() {
         gameEndRevealJob?.cancel()
         gameEndRevealJob = null
+    }
+
+    private fun handleRoomJoinRequest(message: RoomJoinMessage) {
+        val state = _uiState.value
+        val room = state.room
+        if (!room.isHost || room.roomId != message.roomId || room.state != RoomState.Waiting) {
+            return
+        }
+        if (room.players.any { it.id == message.playerId }) {
+            sendOnlineMessage(Protocol.TOPIC_ROOM_UPDATE, buildRoomStateMessage(room), "同步房间", notifyFailure = false)
+            return
+        }
+        if (room.players.size >= room.maxPlayers) {
+            return
+        }
+
+        updateUiState {
+            it.copy(
+                room = it.room.copy(
+                    players = it.room.players + PlayerUiState(
+                        id = message.playerId,
+                        name = message.playerName,
+                        role = PlayerRole.Unknown,
+                        handSize = 0,
+                        isOnline = true,
+                        beanBalance = PlayerProgressManager.INITIAL_BEAN_BALANCE
+                    )
+                )
+            )
+        }
+        sendOnlineMessage(Protocol.TOPIC_ROOM_UPDATE, buildRoomStateMessage(_uiState.value.room), "同步房间", notifyFailure = false)
+    }
+
+    private fun handleRoomLeaveRequest(message: RoomLeaveMessage) {
+        val room = _uiState.value.room
+        if (!room.isHost || room.roomId != message.roomId || message.playerId == humanPlayerId) {
+            return
+        }
+
+        updateUiState {
+            it.copy(
+                room = it.room.copy(
+                    players = it.room.players.filterNot { player -> player.id == message.playerId }
+                )
+            )
+        }
+        sendOnlineMessage(Protocol.TOPIC_ROOM_UPDATE, buildRoomStateMessage(_uiState.value.room), "同步房间", notifyFailure = false)
+    }
+
+    private fun handleRoomListRequest() {
+        val room = _uiState.value.room
+        if (room.isHost && room.roomId.isNotBlank() && room.state == RoomState.Waiting) {
+            sendOnlineMessage(Protocol.TOPIC_ROOM_UPDATE, buildRoomStateMessage(room), "同步房间", notifyFailure = false)
+        }
     }
 
     private fun handleRoomCreated(message: RoomCreatedMessage) {
@@ -412,6 +778,10 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     }
 
     private fun handleRoomJoined(message: RoomJoinedMessage) {
+        if (!isCurrentRoom(message.roomId) || message.players.none { it.id == humanPlayerId }) {
+            return
+        }
+
         currentRoomId = message.roomId
         updateUiState {
             val existingPlayersById = it.room.players.associateBy { player -> player.id }
@@ -449,7 +819,19 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     }
 
     private fun handleRoomState(message: RoomStateMessage) {
-        currentRoomId = message.roomId
+        if (currentRoomId.isBlank() || currentRoomId != message.roomId) {
+            updateDiscoveredRoom(message)
+            return
+        }
+
+        if (message.state == RoomState.Finished && _uiState.value.gameResult == null) {
+            updateDiscoveredRoom(message)
+            resetCurrentRoomPreservingLobby()
+            showFeedback("房间已关闭")
+            return
+        }
+
+        currentRoomMaxPlayers = message.maxPlayers
         updateUiState {
             val existingPlayersById = it.room.players.associateBy { player -> player.id }
             val isHost = message.hostId == humanPlayerId
@@ -457,7 +839,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                 room = RoomUiState(
                     roomId = message.roomId,
                     roomName = message.roomName,
-                    maxPlayers = currentRoomMaxPlayers,
+                    maxPlayers = message.maxPlayers,
                     players = message.players.map { p ->
                         val existing = existingPlayersById[p.id]
                         PlayerUiState(
@@ -488,7 +870,11 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     }
 
     private fun handleGameStarted(message: GameStartMessage) {
-        currentRoomId = message.roomId
+        if (!isCurrentRoom(message.roomId)) {
+            return
+        }
+
+        stopRoomBroadcast()
         currentGameSettlementKey = "multi-${message.roomId}-${message.timestamp}"
         settledGameKey = null
         cancelPendingGameEndReveal()
@@ -527,7 +913,10 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     }
 
     private fun handleBidResult(message: GameBidResultMessage) {
-        currentRoomId = message.roomId
+        if (!isCurrentRoom(message.roomId)) {
+            return
+        }
+
         val nextBidderId = message.nextBidderId
         updateUiState {
             it.copy(
@@ -548,7 +937,10 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     }
 
     private fun handlePlayResult(message: GamePlayResultMessage) {
-        currentRoomId = message.roomId
+        if (!isCurrentRoom(message.roomId)) {
+            return
+        }
+
         val cards = message.cards.map { it.toCard() }
         val nextPlayerId = message.nextPlayerId
         val playedPattern = message.pattern.toHandPattern()
@@ -578,7 +970,10 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     }
 
     private fun handleGameStateUpdate(message: GameStateMessage) {
-        currentRoomId = message.roomId
+        if (!isCurrentRoom(message.roomId)) {
+            return
+        }
+
         val lastPlayedCards = message.lastPlayedCards?.map { it.toCard() }
         val previousMultiplier = _uiState.value.multiplier
         val existingPlayersById = _uiState.value.room.players.associateBy { player -> player.id }
@@ -627,7 +1022,10 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     }
 
     private fun handleGameEnded(message: GameEndMessage) {
-        currentRoomId = message.roomId
+        if (!isCurrentRoom(message.roomId)) {
+            return
+        }
+
         stopHumanTurnTimer()
         val settlementKey = if (currentGameSettlementKey.isBlank()) {
             "multi-${message.roomId}-${message.timestamp}"
