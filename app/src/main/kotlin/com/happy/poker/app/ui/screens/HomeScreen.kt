@@ -153,7 +153,7 @@ fun HomeScreen(
         )
 
         Text(
-            text = "v1.0.1",
+            text = "v1.0.2",
             color = TextGray.copy(alpha = 0.55f),
             fontSize = 11.sp,
             modifier = Modifier
