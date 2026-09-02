@@ -50,6 +50,7 @@ fun MultiplayerGameScreen(
     val specialEffectState by specialEffectsManager.effectState.collectAsState()
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
     var visibleFeedbackId by remember { mutableStateOf(0) }
+    var previousSpecialEffectMultiplier by remember { mutableIntStateOf(uiState.multiplier) }
     val humanBeanBalance = progressManager.getBeanBalance()
 
     DisposableEffect(viewModel) {
@@ -77,13 +78,20 @@ fun MultiplayerGameScreen(
     
     // 监听倍数变化以触发特效
     LaunchedEffect(uiState.multiplier, uiState.lastPlayedPattern?.type) {
-        if (uiState.multiplier > 1) {
-            if (uiState.lastPlayedPattern?.type == PatternType.Rocket) {
-                specialEffectsManager.triggerRocketEffect(uiState.multiplier)
-            } else {
-                specialEffectsManager.triggerBombEffect(uiState.multiplier, 1)
+        val patternType = uiState.lastPlayedPattern?.type
+        val multiplierIncreased = uiState.multiplier > previousSpecialEffectMultiplier
+        if (multiplierIncreased) {
+            when (patternType) {
+                PatternType.Rocket -> {
+                    specialEffectsManager.triggerRocketEffect(uiState.multiplier)
+                }
+                PatternType.Bomb -> {
+                    specialEffectsManager.triggerBombEffect(uiState.multiplier, 1)
+                }
+                else -> Unit
             }
         }
+        previousSpecialEffectMultiplier = uiState.multiplier
     }
     
     Box(modifier = Modifier.fillMaxSize()) {
