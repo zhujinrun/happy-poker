@@ -45,7 +45,6 @@ import com.happy.poker.app.ui.components.PokerLobbyHeader
 import com.happy.poker.app.ui.components.PokerScreenBackground
 import com.happy.poker.app.ui.theme.CardBlack
 import com.happy.poker.app.ui.theme.Gold500
-import com.happy.poker.app.ui.theme.Green600
 import com.happy.poker.app.ui.theme.HappyPokerTheme
 import com.happy.poker.app.ui.theme.TextGray
 import com.happy.poker.app.ui.theme.TextWhite
@@ -62,7 +61,7 @@ fun CreateRoomScreen(
     onCreateClick: (String, Int) -> Unit = { _, _ -> }
 ) {
     var roomName by remember { mutableStateOf(DEFAULT_ROOM_NAME) }
-    var maxPlayers by remember { mutableIntStateOf(3) }
+    var maxPlayers by remember { mutableIntStateOf(2) }
     var localFeedbackMessage by remember { mutableStateOf<String?>(null) }
     var visibleFeedbackId by remember { mutableIntStateOf(0) }
     val canCreate = roomName.isNotBlank()
@@ -85,26 +84,30 @@ fun CreateRoomScreen(
     PokerScreenBackground {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val compact = maxHeight < 560.dp
+            val contentLift = if (compact) 18.dp else 30.dp
 
             Column(modifier = Modifier.fillMaxSize()) {
                 PokerLobbyHeader(
                     title = "创建房间",
-                    onBackClick = onBackClick
+                    onBackClick = onBackClick,
+                    compact = compact
                 )
 
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxWidth()
                         .weight(1f)
                         .padding(
-                            horizontal = if (compact) 30.dp else 42.dp,
-                            vertical = if (compact) 0.dp else 6.dp
-                        ),
-                    contentAlignment = Alignment.Center
+                            start = if (compact) 22.dp else 30.dp,
+                            end = if (compact) 22.dp else 30.dp,
+                            top = if (compact) 0.dp else 4.dp,
+                            bottom = if (compact) 12.dp else 18.dp
+                        )
                 ) {
                     PokerGlassPanel(
                         modifier = Modifier
-                            .offset(y = if (compact) (-12).dp else (-18).dp)
+                            .align(Alignment.Center)
+                            .offset(y = -contentLift)
                             .widthIn(max = 500.dp)
                             .fillMaxWidth(),
                         contentAlignment = Alignment.Center
@@ -175,26 +178,18 @@ fun CreateRoomScreen(
                                 }
                             }
 
-                            Text(
-                                text = if (maxPlayers == 3) "经典斗地主人数" else "双人联机模式",
-                                color = TextWhite.copy(alpha = 0.68f),
-                                fontSize = 13.sp,
-                                textAlign = TextAlign.Center
-                            )
-
-                            PokerImageButton(
-                                normalRes = R.drawable.btn_orange,
-                                text = "创建房间",
-                                enabled = canCreate,
-                                onClick = { onCreateClick(roomName.trim(), maxPlayers) },
-                                modifier = Modifier
-                                    .width(if (compact) 150.dp else 176.dp)
-                                    .height(if (compact) 42.dp else 48.dp),
-                                textColor = CardBlack,
-                                fontSize = if (compact) 15.sp else 17.sp
-                            )
                         }
                     }
+
+                    CreateRoomBottomActions(
+                        compact = compact,
+                        canCreate = canCreate,
+                        onBackClick = onBackClick,
+                        onCreateClick = { onCreateClick(roomName.trim(), maxPlayers) },
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = contentLift)
+                    )
                 }
             }
 
@@ -205,6 +200,47 @@ fun CreateRoomScreen(
                     .offset(y = if (compact) 78.dp else 96.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun CreateRoomBottomActions(
+    compact: Boolean,
+    canCreate: Boolean,
+    onBackClick: () -> Unit,
+    onCreateClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .width(if (compact) 272.dp else 308.dp)
+            .height(if (compact) 48.dp else 55.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        PokerImageButton(
+            normalRes = R.drawable.btn_green,
+            text = "返回大厅",
+            onClick = onBackClick,
+            modifier = Modifier
+                .width(if (compact) 128.dp else 146.dp)
+                .height(if (compact) 48.dp else 55.dp),
+            fontSize = if (compact) 14.sp else 16.sp
+        )
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        PokerImageButton(
+            normalRes = R.drawable.btn_orange,
+            text = "创建房间",
+            enabled = canCreate,
+            onClick = onCreateClick,
+            modifier = Modifier
+                .width(if (compact) 128.dp else 146.dp)
+                .height(if (compact) 48.dp else 55.dp),
+            textColor = CardBlack,
+            fontSize = if (compact) 14.sp else 16.sp
+        )
     }
 }
 

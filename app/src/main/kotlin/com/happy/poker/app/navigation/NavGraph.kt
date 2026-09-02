@@ -144,7 +144,7 @@ fun NavGraph(
                 viewModel = multiplayerViewModel,
                 onBackClick = {
                     multiplayerViewModel.leaveRoom()
-                    navController.popBackStackOrHome()
+                    navController.navigateRoomList()
                 }
             )
         }
@@ -201,5 +201,16 @@ private fun NavHostController.navigateHome() {
 private fun NavHostController.popBackStackOrHome() {
     if (!popBackStack()) {
         navigateHome()
+    }
+}
+
+private fun NavHostController.navigateRoomList() {
+    if (!popBackStack(Screen.RoomList.route, inclusive = false)) {
+        navigate(Screen.RoomList.route) {
+            popUpTo(Screen.Home.route) {
+                inclusive = false
+            }
+            launchSingleTop = true
+        }
     }
 }

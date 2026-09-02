@@ -60,20 +60,31 @@ fun PokerScreenBackground(
     }
 }
 
+fun pokerTopHorizontalInset(compact: Boolean) = if (compact) 16.dp else 24.dp
+
+fun pokerTopVerticalInset(compact: Boolean) = if (compact) 4.dp else 8.dp
+
 @Composable
 fun PokerLobbyHeader(
     title: String,
     subtitle: String? = null,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
     trailing: (@Composable () -> Unit)? = null
 ) {
-    val headerHeight = if (subtitle.isNullOrBlank()) 48.dp else 56.dp
+    val topInset = pokerTopVerticalInset(compact)
+    val horizontalInset = pokerTopHorizontalInset(compact)
+    val headerHeight = (if (subtitle.isNullOrBlank()) 48.dp else 56.dp) + topInset
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(headerHeight)
-            .padding(horizontal = 22.dp)
+            .padding(
+                start = horizontalInset,
+                end = horizontalInset,
+                top = topInset
+            )
     ) {
         PokerBackButton(
             onClick = onBackClick,

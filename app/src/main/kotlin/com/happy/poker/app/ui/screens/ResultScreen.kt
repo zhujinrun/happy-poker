@@ -55,6 +55,7 @@ fun ResultScreen(
                 PokerLobbyHeader(
                     title = "牌局结算",
                     onBackClick = onBackToHomeClick,
+                    compact = compactHeight,
                     trailing = {
                         BeanStatusPill(beanBalance = beanBalance, compact = true)
                     }

@@ -169,7 +169,7 @@ fun PlayingCard(
     ) {
         if (isFaceDown) {
             Image(
-                painter = painterResource(id = R.drawable.card_back_new),
+                painter = painterResource(id = R.drawable.card_back),
                 contentDescription = "牌背",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop

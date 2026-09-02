@@ -28,13 +28,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Vibration
 import androidx.compose.material.icons.outlined.Wifi
-import androidx.compose.material.icons.outlined.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -118,6 +118,7 @@ fun SettingsScreen(
                 PokerLobbyHeader(
                     title = "设置中心",
                     onBackClick = onBackClick,
+                    compact = compact,
                     trailing = {
                         if (showSaved) {
                             PokerStatusPill(text = "已保存", color = Green600)
@@ -460,7 +461,7 @@ private fun ExperienceSettingsPage(
         )
 
         SettingsToggleRow(
-            icon = Icons.Outlined.VolumeUp,
+            icon = Icons.AutoMirrored.Outlined.VolumeUp,
             title = "音效",
             description = "播放出牌、叫分和结果音效",
             checked = soundEnabled,
@@ -503,7 +504,7 @@ private fun ExperienceSettingsPage(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = Icons.Outlined.VolumeUp,
+                imageVector = Icons.AutoMirrored.Outlined.VolumeUp,
                 contentDescription = null,
                 tint = Gold500,
                 modifier = Modifier.size(20.dp)
@@ -536,7 +537,7 @@ private fun ExperienceSettingsPage(
                     )
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.VolumeUp,
+                    imageVector = Icons.AutoMirrored.Outlined.VolumeUp,
                     contentDescription = "试听牌面语音",
                     tint = if (soundEnabled) CardBlack else TextGray,
                     modifier = Modifier.size(20.dp)

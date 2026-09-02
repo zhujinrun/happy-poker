@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.happy.poker.app.R
 import com.happy.poker.app.ui.components.PokerGlassPanel
+import com.happy.poker.app.ui.components.PokerIconButton
 import com.happy.poker.app.ui.components.PokerImageButton
 import com.happy.poker.app.ui.components.PokerLobbyHeader
 import com.happy.poker.app.ui.components.PokerScreenBackground
@@ -70,21 +71,28 @@ fun RoomListScreen(
     PokerScreenBackground {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val compact = maxHeight < 560.dp
+            val contentLift = if (compact) 18.dp else 30.dp
 
             Column(modifier = Modifier.fillMaxSize()) {
                 PokerLobbyHeader(
                     title = "联机大厅",
                     onBackClick = onBackClick,
-                    trailing = {
-                        PokerImageButton(
-                            normalRes = R.drawable.btn_orange,
-                            text = "创建",
-                            onClick = onCreateRoomClick,
-                            modifier = Modifier
-                                .width(76.dp)
-                                .height(36.dp),
-                            fontSize = 14.sp
-                        )
+                    compact = compact,
+                    trailing = if (rooms.isNotEmpty()) {
+                        {
+                            PokerIconButton(
+                                iconRes = R.drawable.poker_room_create,
+                                onClick = onCreateRoomClick,
+                                modifier = Modifier
+                                    .width(48.dp)
+                                    .height(48.dp),
+                                iconWidth = if (compact) 32.dp else 36.dp,
+                                iconHeight = if (compact) 32.dp else 36.dp,
+                                contentDescription = "创建房间"
+                            )
+                        }
+                    } else {
+                        null
                     }
                 )
 
@@ -102,21 +110,31 @@ fun RoomListScreen(
                     if (rooms.isEmpty()) {
                         EmptyRoomState(
                             compact = compact,
-                            onCreateRoomClick = onCreateRoomClick,
                             modifier = Modifier
                                 .align(Alignment.Center)
-                                .offset(y = if (compact) (-10).dp else (-18).dp)
+                                .offset(y = -contentLift)
+                                .widthIn(max = 420.dp)
+                                .fillMaxWidth()
+                        )
+                        RoomListBottomActions(
+                            compact = compact,
+                            onBackClick = onBackClick,
+                            onCreateRoomClick = onCreateRoomClick,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = contentLift)
                         )
                     } else {
                         LazyColumn(
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
+                                .padding(top = if (compact) 6.dp else 14.dp)
                                 .widthIn(max = 700.dp)
                                 .fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(if (compact) 9.dp else 12.dp),
                             contentPadding = PaddingValues(
                                 top = if (compact) 0.dp else 4.dp,
-                                bottom = 16.dp
+                                bottom = if (compact) 18.dp else 24.dp
                             )
                         ) {
                             items(rooms) { room ->
@@ -137,7 +155,6 @@ fun RoomListScreen(
 @Composable
 private fun EmptyRoomState(
     compact: Boolean,
-    onCreateRoomClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     PokerGlassPanel(
@@ -169,17 +186,46 @@ private fun EmptyRoomState(
                 fontSize = if (compact) 12.sp else 14.sp,
                 textAlign = TextAlign.Center
             )
-            PokerImageButton(
-                normalRes = R.drawable.btn_orange,
-                text = "创建房间",
-                onClick = onCreateRoomClick,
-                modifier = Modifier
-                    .width(132.dp)
-                    .height(42.dp),
-                textColor = CardBlack,
-                fontSize = 15.sp
-            )
         }
+    }
+}
+
+@Composable
+private fun RoomListBottomActions(
+    compact: Boolean,
+    onBackClick: () -> Unit,
+    onCreateRoomClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .width(if (compact) 272.dp else 308.dp)
+            .height(if (compact) 48.dp else 55.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        PokerImageButton(
+            normalRes = R.drawable.btn_green,
+            text = "返回主页",
+            onClick = onBackClick,
+            modifier = Modifier
+                .width(if (compact) 128.dp else 146.dp)
+                .height(if (compact) 48.dp else 55.dp),
+            fontSize = if (compact) 14.sp else 16.sp
+        )
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        PokerImageButton(
+            normalRes = R.drawable.btn_orange,
+            text = "创建房间",
+            onClick = onCreateRoomClick,
+            modifier = Modifier
+                .width(if (compact) 128.dp else 146.dp)
+                .height(if (compact) 48.dp else 55.dp),
+            textColor = CardBlack,
+            fontSize = if (compact) 14.sp else 16.sp
+        )
     }
 }
 
@@ -191,6 +237,16 @@ fun RoomCard(
 ) {
     val isWaiting = room.state.contains("等待")
     val isFull = room.playerCount >= room.maxPlayers
+    val statusText = when {
+        isFull -> "满员"
+        isWaiting -> "加入"
+        else -> "对局中"
+    }
+    val statusColor = when {
+        isFull -> ButtonDanger
+        isWaiting -> Gold500
+        else -> Green600
+    }
     val shape = RoundedCornerShape(18.dp)
 
     Box(
@@ -226,7 +282,7 @@ fun RoomCard(
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.card_back_new),
+                    painter = painterResource(id = R.drawable.poker_room),
                     contentDescription = null,
                     modifier = Modifier.size(if (compact) 30.dp else 34.dp),
                     contentScale = ContentScale.Fit
@@ -234,34 +290,14 @@ fun RoomCard(
             }
 
             Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = room.name,
-                        color = TextWhite,
-                        fontSize = if (compact) 16.sp else 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    PokerStatusPill(
-                        text = when {
-                            isFull -> "满员"
-                            isWaiting -> "等待"
-                            else -> "对局中"
-                        },
-                        color = when {
-                            isFull -> ButtonDanger
-                            isWaiting -> Gold500
-                            else -> Green600
-                        }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = room.name,
+                    color = TextWhite,
+                    fontSize = if (compact) 16.sp else 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -279,6 +315,11 @@ fun RoomCard(
                     )
                 }
             }
+
+            PokerStatusPill(
+                text = statusText,
+                color = statusColor
+            )
         }
     }
 }

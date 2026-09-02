@@ -5,13 +5,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -95,15 +93,18 @@ fun MultiplayerGameScreen(
     }
     
     Box(modifier = Modifier.fillMaxSize()) {
-        when (uiState.room.state) {
-            RoomState.Waiting -> WaitingRoomContent(
+        when {
+            uiState.room.state == RoomState.Waiting && uiState.room.roomId.isBlank() -> {
+                PokerScreenBackground {}
+            }
+            uiState.room.state == RoomState.Waiting -> WaitingRoomContent(
                 room = uiState.room,
                 isHost = uiState.room.isHost,
                 onReadyClick = { viewModel.setReady(true) },
                 onStartClick = { viewModel.startGame() },
                 onBackClick = onBackClick
             )
-            RoomState.Bidding, RoomState.Playing -> GameContent(
+            uiState.room.state == RoomState.Bidding || uiState.room.state == RoomState.Playing -> GameContent(
                 playerCards = uiState.playerCards,
                 selectedCards = uiState.selectedCards,
                 onCardClick = { viewModel.selectCard(it.id) },
@@ -127,7 +128,7 @@ fun MultiplayerGameScreen(
                 localPlayerId = viewModel.localPlayerId,
                 onBackClick = onBackClick
             )
-            RoomState.Finished -> {
+            uiState.room.state == RoomState.Finished -> {
                 uiState.gameResult?.let { result ->
                     ResultScreen(
                         winner = when (result.winnerRole) {
@@ -190,145 +191,128 @@ fun WaitingRoomContent(
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val compact = maxHeight < 560.dp
             val seatCount = room.maxPlayers.coerceAtLeast(2)
-            val horizontalInset = if (compact) 18.dp else 24.dp
+            val contentLift = if (compact) 18.dp else 30.dp
 
-            PokerBackButton(
-                onClick = onBackClick,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(start = horizontalInset, top = if (compact) 2.dp else 8.dp),
-                contentDescription = "返回房间列表"
-            )
-
-            Column(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = if (compact) 8.dp else 12.dp)
-                    .widthIn(max = 430.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = room.roomName.ifBlank { "欢乐房间" },
-                    color = Gold500,
-                    fontSize = if (compact) 20.sp else 24.sp,
-                    fontWeight = FontWeight.Black,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+            Column(modifier = Modifier.fillMaxSize()) {
+                PokerLobbyHeader(
+                    title = room.roomName.ifBlank { "欢乐房间" },
+                    subtitle = if (isHost) "房主等待开局" else "等待房主开局",
+                    onBackClick = onBackClick,
+                    compact = compact
                 )
-                Text(
-                    text = if (isHost) "房主等待开局" else "等待房主开局",
-                    color = TextWhite.copy(alpha = 0.72f),
-                    fontSize = if (compact) 11.sp else 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1
-                )
-            }
 
-            PokerStatusPill(
-                text = room.state.displayName,
-                color = if (room.state == RoomState.Waiting) Gold500 else Green600,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(end = horizontalInset, top = if (compact) 13.dp else 18.dp)
-            )
-
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .offset(y = if (compact) (-4).dp else (-10).dp)
-                    .widthIn(max = if (compact) 600.dp else 720.dp)
-                    .fillMaxWidth()
-                    .height(if (compact) 150.dp else 178.dp)
-                    .padding(horizontal = if (compact) 34.dp else 46.dp),
-                contentAlignment = Alignment.Center
-            ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(if (compact) 88.dp else 104.dp)
-                        .clip(RoundedCornerShape(42.dp))
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color(0xFF163B76).copy(alpha = 0.22f),
-                                    Color(0xFF07132A).copy(alpha = 0.18f)
-                                )
-                            )
-                        )
-                        .border(
-                            width = 1.dp,
-                            color = Color.White.copy(alpha = 0.12f),
-                            shape = RoundedCornerShape(42.dp)
-                        )
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    room.players.take(seatCount).forEach { player ->
-                        WaitingSeat(
-                            player = player,
-                            displayName = waitingSeatDisplayName(player, room.players),
-                            isHostSeat = player.id == room.hostId,
-                            compact = compact
-                        )
-                    }
-                    repeat((seatCount - room.players.size).coerceAtLeast(0)) {
-                        EmptySeat(compact = compact)
-                    }
-                }
-            }
-
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = if (compact) 18.dp else 28.dp)
-                    .widthIn(max = 388.dp)
-                    .fillMaxWidth(0.52f),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                PokerImageButton(
-                    normalRes = R.drawable.btn_green,
-                    text = "退出",
-                    onClick = onBackClick,
-                    modifier = Modifier
                         .weight(1f)
-                        .height(if (compact) 42.dp else 48.dp),
-                    fontSize = if (compact) 15.sp else 16.sp,
-                    contentDescription = "返回房间列表"
-                )
-
-                if (isHost) {
-                    PokerImageButton(
-                        normalRes = R.drawable.btn_orange,
-                        text = "开始游戏",
-                        onClick = onStartClick,
-                        enabled = room.players.size >= 2,
+                        .padding(
+                            start = if (compact) 22.dp else 30.dp,
+                            end = if (compact) 22.dp else 30.dp,
+                            top = if (compact) 0.dp else 4.dp,
+                            bottom = if (compact) 12.dp else 18.dp
+                        )
+                ) {
+                    WaitingRoomCard(
+                        room = room,
+                        seatCount = seatCount,
+                        compact = compact,
                         modifier = Modifier
-                            .weight(1f)
-                            .height(if (compact) 42.dp else 48.dp),
-                        textColor = CardBlack,
-                        fontSize = if (compact) 15.sp else 16.sp
+                            .align(Alignment.Center)
+                            .offset(y = -contentLift)
                     )
-                } else {
-                    PokerImageButton(
-                        normalRes = R.drawable.btn_orange,
-                        text = "准备",
-                        onClick = onReadyClick,
+
+                    WaitingRoomBottomActions(
+                        compact = compact,
+                        primaryText = if (isHost) "开始游戏" else "准备",
+                        primaryEnabled = if (isHost) room.players.size >= 2 else true,
+                        onBackClick = onBackClick,
+                        onPrimaryClick = if (isHost) onStartClick else onReadyClick,
                         modifier = Modifier
-                            .weight(1f)
-                            .height(if (compact) 42.dp else 48.dp),
-                        textColor = CardBlack,
-                        fontSize = if (compact) 15.sp else 16.sp
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = contentLift)
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun WaitingRoomCard(
+    room: com.happy.poker.app.viewmodel.RoomUiState,
+    seatCount: Int,
+    compact: Boolean,
+    modifier: Modifier = Modifier
+) {
+    PokerGlassPanel(
+        modifier = modifier
+            .widthIn(max = if (compact) 600.dp else 720.dp)
+            .fillMaxWidth()
+            .height(if (compact) 150.dp else 178.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = if (compact) 18.dp else 28.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            room.players.take(seatCount).forEach { player ->
+                WaitingSeat(
+                    player = player,
+                    displayName = waitingSeatDisplayName(player, room.players),
+                    isHostSeat = player.id == room.hostId,
+                    compact = compact
+                )
+            }
+            repeat((seatCount - room.players.size).coerceAtLeast(0)) {
+                EmptySeat(compact = compact)
+            }
+        }
+    }
+}
+
+@Composable
+private fun WaitingRoomBottomActions(
+    compact: Boolean,
+    primaryText: String,
+    primaryEnabled: Boolean,
+    onBackClick: () -> Unit,
+    onPrimaryClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .width(if (compact) 272.dp else 308.dp)
+            .height(if (compact) 48.dp else 55.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        PokerImageButton(
+            normalRes = R.drawable.btn_green,
+            text = "退出房间",
+            onClick = onBackClick,
+            modifier = Modifier
+                .width(if (compact) 128.dp else 146.dp)
+                .height(if (compact) 48.dp else 55.dp),
+            fontSize = if (compact) 14.sp else 16.sp,
+            contentDescription = "返回房间列表"
+        )
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        PokerImageButton(
+            normalRes = R.drawable.btn_orange,
+            text = primaryText,
+            onClick = onPrimaryClick,
+            enabled = primaryEnabled,
+            modifier = Modifier
+                .width(if (compact) 128.dp else 146.dp)
+                .height(if (compact) 48.dp else 55.dp),
+            textColor = CardBlack,
+            fontSize = if (compact) 14.sp else 16.sp
+        )
     }
 }
 

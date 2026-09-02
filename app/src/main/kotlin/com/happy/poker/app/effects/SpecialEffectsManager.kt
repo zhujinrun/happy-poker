@@ -533,7 +533,7 @@ private fun BombCardFan(cardCount: Int) {
             val middle = (cardCount - 1) / 2f
             val distanceFromMiddle = abs(index - middle)
             Image(
-                painter = painterResource(id = R.drawable.card_back_new),
+                painter = painterResource(id = R.drawable.card_back),
                 contentDescription = "炸弹牌",
                 modifier = Modifier
                     .width(58.dp)

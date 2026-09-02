@@ -50,6 +50,8 @@ import com.happy.poker.app.ui.components.CounterStatusPlate
 import com.happy.poker.app.ui.components.PokerBackButton
 import com.happy.poker.app.ui.components.PokerBackPlaceholder
 import com.happy.poker.app.ui.components.PokerSettingsButton
+import com.happy.poker.app.ui.components.pokerTopHorizontalInset
+import com.happy.poker.app.ui.components.pokerTopVerticalInset
 import com.happy.poker.app.ui.theme.HappyPokerTheme
 import com.happy.poker.app.ui.theme.TextGray
 import com.happy.poker.app.ui.theme.TextWhite
@@ -70,7 +72,8 @@ fun HomeScreen(
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val compactHeight = maxHeight < 430.dp
-        val horizontalInset = if (compactHeight) 16.dp else 24.dp
+        val horizontalInset = pokerTopHorizontalInset(compactHeight)
+        val topInset = pokerTopVerticalInset(compactHeight)
 
         PokerBlueTableBackground()
 
@@ -93,7 +96,7 @@ fun HomeScreen(
             onBackClick = onBackClick,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(horizontal = horizontalInset, vertical = if (compactHeight) 4.dp else 8.dp)
+                .padding(horizontal = horizontalInset, vertical = topInset)
         )
 
         Column(

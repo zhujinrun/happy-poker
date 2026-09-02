@@ -141,7 +141,7 @@ fun PokerBackButton(
     contentDescription: String = "返回"
 ) {
     PokerIconButton(
-        iconRes = R.drawable.poker_back,
+        iconRes = R.drawable.poker_back_arrow,
         onClick = onClick,
         modifier = modifier
             .width(PokerTopIconButtonSize)
@@ -182,7 +182,7 @@ fun PokerBackPlaceholder(
         contentAlignment = Alignment.Center
     ) {
         Image(
-            painter = painterResource(id = R.drawable.poker_back),
+            painter = painterResource(id = R.drawable.poker_back_arrow),
             contentDescription = contentDescription,
             modifier = Modifier
                 .width(PokerTopIconSize)

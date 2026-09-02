@@ -310,6 +310,8 @@ fun GameScreenContent(
                 compactHeight -> 12.dp
                 else -> 18.dp
             }
+            val topHorizontalInset = pokerTopHorizontalInset(compactHeight)
+            val topVerticalInset = pokerTopVerticalInset(compactHeight)
             val centerWidthFraction = when {
                 tightLandscape -> 0.52f
                 compactHeight && landscape -> 0.60f
@@ -362,7 +364,7 @@ fun GameScreenContent(
                 tightLandscape = tightLandscape,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(horizontal = sideInset, vertical = if (tightLandscape) 4.dp else 7.dp)
+                    .padding(horizontal = topHorizontalInset, vertical = topVerticalInset)
                     .zIndex(10f)
             )
 
@@ -676,7 +678,7 @@ private fun MiniCardBack(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Image(
-            painter = painterResource(id = R.drawable.card_back_new),
+            painter = painterResource(id = R.drawable.card_back),
             contentDescription = "底牌牌背",
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Fit
@@ -980,7 +982,7 @@ private fun OpponentMiniHand(cardCount: Int, compact: Boolean = false) {
     ) {
         repeat(3) { index ->
             Image(
-                painter = painterResource(id = R.drawable.opponent_card_back_new),
+                painter = painterResource(id = R.drawable.card_back_opponent),
                 contentDescription = "对手手牌",
                 modifier = Modifier
                     .width(if (compact) 15.dp else 18.dp)
