@@ -31,6 +31,7 @@ private fun Window.configurePokerWindow() {
         WindowManager.LayoutParams.FLAG_FULLSCREEN,
         WindowManager.LayoutParams.FLAG_FULLSCREEN
     )
+    addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
         attributes = attributes.apply {

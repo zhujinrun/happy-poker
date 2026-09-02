@@ -3,6 +3,7 @@ package com.happy.poker.core.network
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.eclipse.paho.client.mqttv3.*
+import org.eclipse.paho.client.mqttv3.logging.LoggerFactory
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -91,6 +92,8 @@ class PahoMqttClient : MqttClient {
         currentConfig = config
 
         try {
+            LoggerFactory.setLogger(NoOpMqttLogger::class.java.name)
+
             // 创建Paho客户端
             pahoClient = MqttAsyncClient(
                 config.brokerUrl,
@@ -140,6 +143,12 @@ class PahoMqttClient : MqttClient {
 
             // 连接
             pahoClient!!.connect(options).waitForCompletion(config.connectionTimeout * 1000L)
+            if (pahoClient?.isConnected == true) {
+                _connectionState.value = ConnectionState.CONNECTED
+                callback?.onConnected()
+            } else {
+                throw MqttException(MqttException.REASON_CODE_CLIENT_NOT_CONNECTED.toInt())
+            }
 
             // 订阅之前已订阅的topics
             subscriptions.forEach { topic ->
@@ -226,7 +235,13 @@ class PahoMqttClient : MqttClient {
     /**
      * 检查是否已连接
      */
-    fun isConnected(): Boolean = _connectionState.value == ConnectionState.CONNECTED
+    fun isConnected(): Boolean {
+        val connected = pahoClient?.isConnected == true
+        if (connected && _connectionState.value != ConnectionState.CONNECTED) {
+            _connectionState.value = ConnectionState.CONNECTED
+        }
+        return connected
+    }
 
     /**
      * 获取当前配置
@@ -314,7 +329,13 @@ class GameMqttClient(
     /**
      * 获取连接状态
      */
-    fun getConnectionState(): ConnectionState = mqttClient.connectionState.value
+    fun getConnectionState(): ConnectionState {
+        return if (mqttClient.isConnected()) {
+            ConnectionState.CONNECTED
+        } else {
+            mqttClient.connectionState.value
+        }
+    }
 
     /**
      * 是否已连接

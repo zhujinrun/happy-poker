@@ -1,12 +1,15 @@
 package com.happy.poker.app.sound
 
 import android.content.Context
+import android.util.Log
 import com.happy.poker.app.settings.AppHaptics
 import com.happy.poker.core.model.HandPattern
 import com.happy.poker.core.model.PatternType
 import com.happy.poker.core.model.Rank
 
 object GameAudio {
+    private const val TAG = "GameAudio"
+
     @Volatile
     private var soundManager: SoundManager? = null
     @Volatile
@@ -67,7 +70,11 @@ object GameAudio {
         if (soundManager != null) return
         synchronized(this) {
             if (soundManager == null) {
-                soundManager = SoundManager(context.applicationContext)
+                soundManager = runCatching {
+                    SoundManager(context.applicationContext)
+                }.onFailure {
+                    Log.e(TAG, "Failed to initialize game audio", it)
+                }.getOrNull()
             }
         }
     }
