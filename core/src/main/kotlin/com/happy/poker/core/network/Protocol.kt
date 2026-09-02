@@ -293,7 +293,9 @@ data class GameStateMessage(
     val multiplier: Int,
     val lastPlayedCards: List<CardInfo>?,
     val lastPlayedPlayerId: String?,
-    val players: List<PlayerStateInfo>
+    val players: List<PlayerStateInfo>,
+    val currentBid: Int = 0,
+    val bottomCards: List<CardInfo> = emptyList()
 ) : Message {
     override val type: MessageType = MessageType.GAME_STATE_UPDATE
     override val timestamp: Long = System.currentTimeMillis()
@@ -444,7 +446,8 @@ data class PlayerStateInfo(
     val role: PlayerRole,
     val handSize: Int,
     val isOnline: Boolean,
-    val isReady: Boolean
+    val isReady: Boolean,
+    val handCards: List<CardInfo> = emptyList()
 )
 
 /**

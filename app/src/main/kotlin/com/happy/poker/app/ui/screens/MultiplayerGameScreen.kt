@@ -316,6 +316,7 @@ fun WaitingRoomContent(
                         modifier = Modifier
                             .weight(1f)
                             .height(if (compact) 42.dp else 48.dp),
+                        textColor = CardBlack,
                         fontSize = if (compact) 15.sp else 16.sp
                     )
                 }
