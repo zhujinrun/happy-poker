@@ -93,8 +93,7 @@ fun MultiplayerGameScreen(
                 isHost = uiState.room.isHost,
                 onReadyClick = { viewModel.setReady(true) },
                 onStartClick = { viewModel.startGame() },
-                onBackClick = onBackClick,
-                humanAvatarKey = appSettingsManager.getAvatarKey()
+                onBackClick = onBackClick
             )
             RoomState.Bidding, RoomState.Playing -> GameContent(
                 playerCards = uiState.playerCards,
@@ -117,6 +116,7 @@ fun MultiplayerGameScreen(
                 players = uiState.room.players,
                 beanBalance = humanBeanBalance,
                 humanAvatarKey = appSettingsManager.getAvatarKey(),
+                localPlayerId = viewModel.localPlayerId,
                 onBackClick = onBackClick
             )
             RoomState.Finished -> {
@@ -128,13 +128,13 @@ fun MultiplayerGameScreen(
                             else -> "未知"
                         },
                         isLandlordWin = uiState.room.players.find {
-                            it.id.startsWith("human_player_")
+                            it.id == viewModel.localPlayerId
                         }?.let { player ->
                             player.role == result.winnerRole || player.id == result.winnerId
                         } ?: true,
                         players = uiState.room.players.map { player ->
                             com.happy.poker.app.ui.screens.PlayerResult(
-                                name = player.name,
+                                name = waitingSeatDisplayName(player, uiState.room.players),
                                 role = when (player.role) {
                                     PlayerRole.Landlord -> "地主"
                                     PlayerRole.Farmer -> "农民"
@@ -176,8 +176,7 @@ fun WaitingRoomContent(
     isHost: Boolean,
     onReadyClick: () -> Unit = {},
     onStartClick: () -> Unit = {},
-    onBackClick: () -> Unit = {},
-    humanAvatarKey: String = AppSettingsManager.DEFAULT_AVATAR
+    onBackClick: () -> Unit = {}
 ) {
     PokerScreenBackground {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -265,9 +264,9 @@ fun WaitingRoomContent(
                     room.players.take(seatCount).forEach { player ->
                         WaitingSeat(
                             player = player,
+                            displayName = waitingSeatDisplayName(player, room.players),
                             isHostSeat = player.id == room.hostId,
-                            compact = compact,
-                            humanAvatarKey = humanAvatarKey
+                            compact = compact
                         )
                     }
                     repeat((seatCount - room.players.size).coerceAtLeast(0)) {
@@ -328,21 +327,11 @@ fun WaitingRoomContent(
 @Composable
 private fun WaitingSeat(
     player: PlayerUiState,
+    displayName: String,
     isHostSeat: Boolean,
-    compact: Boolean,
-    humanAvatarKey: String
+    compact: Boolean
 ) {
-    val avatarRes = if (player.id.startsWith("human_player")) {
-        when (humanAvatarKey) {
-            "daheng" -> R.drawable.avatar_daheng
-            "luoli" -> R.drawable.avatar_luoli
-            else -> R.drawable.avatar_yujie
-        }
-    } else if (player.id.hashCode() % 2 == 0) {
-        R.drawable.avatar_daheng
-    } else {
-        R.drawable.avatar_luoli
-    }
+    val avatarRes = waitingAvatarResource(player)
     val avatarSize = if (compact) 58.dp else 70.dp
     val seatWidth = if (compact) 96.dp else 116.dp
 
@@ -365,7 +354,7 @@ private fun WaitingSeat(
         ) {
             Image(
                 painter = painterResource(id = avatarRes),
-                contentDescription = player.name,
+                contentDescription = displayName,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(if (compact) 106.dp else 126.dp)
@@ -376,7 +365,7 @@ private fun WaitingSeat(
         }
 
         Text(
-            text = player.name,
+            text = displayName,
             color = TextWhite,
             fontSize = if (compact) 11.sp else 12.sp,
             fontWeight = FontWeight.Bold,
@@ -385,6 +374,28 @@ private fun WaitingSeat(
             textAlign = TextAlign.Center
         )
         BeanAmountText(beanBalance = player.beanBalance, compact = true)
+    }
+}
+
+private fun waitingSeatDisplayName(player: PlayerUiState, players: List<PlayerUiState>): String {
+    val name = player.name.ifBlank { "牌友" }
+    val sameNamePlayers = players.filter { it.name.ifBlank { "牌友" } == name }
+    if (sameNamePlayers.size <= 1) return name
+
+    val seatIndex = sameNamePlayers.indexOfFirst { it.id == player.id }.takeIf { it >= 0 } ?: 0
+    return "$name${seatIndex + 1}"
+}
+
+private fun waitingAvatarResource(player: PlayerUiState): Int {
+    return when (player.avatarKey) {
+        "daheng" -> R.drawable.avatar_daheng
+        "luoli" -> R.drawable.avatar_luoli
+        "yujie" -> R.drawable.avatar_yujie
+        else -> if ((player.id.hashCode() and 1) == 0) {
+            R.drawable.avatar_luoli
+        } else {
+            R.drawable.avatar_yujie
+        }
     }
 }
 
@@ -441,6 +452,7 @@ fun GameContent(
     players: List<PlayerUiState> = emptyList(),
     beanBalance: Int = PlayerProgressManager.INITIAL_BEAN_BALANCE,
     humanAvatarKey: String = AppSettingsManager.DEFAULT_AVATAR,
+    localPlayerId: String? = null,
     onBackClick: () -> Unit = {}
 ) {
     GameScreenContent(
@@ -464,6 +476,7 @@ fun GameContent(
         lastPlayedBy = lastPlayedBy,
         beanBalance = beanBalance,
         humanAvatarKey = humanAvatarKey,
+        localPlayerId = localPlayerId,
         onBackClick = onBackClick
     )
 }

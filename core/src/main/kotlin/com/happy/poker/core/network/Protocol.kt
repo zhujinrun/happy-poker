@@ -102,7 +102,8 @@ data class RoomCreateMessage(
     val playerName: String,
     val playerId: String,
     val maxPlayers: Int = 3,
-    val isPrivate: Boolean = false
+    val isPrivate: Boolean = false,
+    val avatarKey: String? = null
 ) : Message {
     override val type: MessageType = MessageType.ROOM_CREATE
     override val timestamp: Long = System.currentTimeMillis()
@@ -127,7 +128,8 @@ data class RoomCreatedMessage(
 data class RoomJoinMessage(
     val roomId: String,
     val playerName: String,
-    val playerId: String
+    val playerId: String,
+    val avatarKey: String? = null
 ) : Message {
     override val type: MessageType = MessageType.ROOM_JOIN
     override val timestamp: Long = System.currentTimeMillis()
@@ -365,7 +367,8 @@ data class PlayerInfo(
     val name: String,
     val isAI: Boolean = false,
     val isOnline: Boolean = true,
-    val isReady: Boolean = false
+    val isReady: Boolean = false,
+    val avatarKey: String? = null
 )
 
 /**
@@ -447,7 +450,8 @@ data class PlayerStateInfo(
     val handSize: Int,
     val isOnline: Boolean,
     val isReady: Boolean,
-    val handCards: List<CardInfo> = emptyList()
+    val handCards: List<CardInfo> = emptyList(),
+    val avatarKey: String? = null
 )
 
 /**

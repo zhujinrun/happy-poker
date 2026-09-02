@@ -280,23 +280,26 @@ fun GameScreenContent(
     lastPlayedBy: String? = null,
     beanBalance: Int = PlayerProgressManager.INITIAL_BEAN_BALANCE,
     humanAvatarKey: String = AppSettingsManager.DEFAULT_AVATAR,
+    localPlayerId: String? = null,
     onBackClick: () -> Unit = {}
 ) {
-    val isLocalHumanPlayer: (PlayerUiState) -> Boolean = {
-        it.id == "human_player" || it.id.startsWith("human_player_") || it.name == "我"
+    val isLocalHumanPlayer: (PlayerUiState) -> Boolean = { player ->
+        localPlayerId?.let { player.id == it } ?: (player.id == "human_player" || player.name == "我")
     }
     val humanPlayer = players.find(isLocalHumanPlayer) ?: PlayerUiState(
         id = "human_player",
         name = "我",
         role = PlayerRole.Unknown,
         handSize = playerCards.size,
-        beanBalance = beanBalance
+        beanBalance = beanBalance,
+        avatarKey = humanAvatarKey
     )
     val localBeanBalance = if (isLocalHumanPlayer(humanPlayer)) {
         beanBalance
     } else {
         humanPlayer.beanBalance
     }
+    val playerDisplayNames = uniquePlayerDisplayNames(players)
     GameTable {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val compactHeight = maxHeight < 430.dp
@@ -416,7 +419,8 @@ fun GameScreenContent(
 
             LocalPlayerBadge(
                 player = humanPlayer.copy(handSize = playerCards.size, beanBalance = localBeanBalance),
-                avatarKey = humanAvatarKey,
+                avatarKey = humanPlayer.avatarKey ?: humanAvatarKey,
+                displayName = playerDisplayNames[humanPlayer.id] ?: humanPlayer.name,
                 compact = compactHeight,
                 tightLandscape = tightLandscape,
                 modifier = Modifier
@@ -697,6 +701,7 @@ private fun OpponentStrip(
     }
     val leftPlayer = seatedPlayers.getOrNull(1)
     val rightPlayer = seatedPlayers.getOrNull(2)
+    val playerDisplayNames = uniquePlayerDisplayNames(players)
     val badgeWidth = when {
         tightLandscape -> 126.dp
         compact -> 144.dp
@@ -710,7 +715,8 @@ private fun OpponentStrip(
     ) {
         PlayerBadgeCard(
             player = leftPlayer,
-            avatarRes = R.drawable.avatar_luoli,
+            displayName = leftPlayer?.let { playerDisplayNames[it.id] ?: it.name }.orEmpty(),
+            avatarRes = avatarResourceForKey(leftPlayer?.avatarKey, R.drawable.avatar_luoli),
             isCurrentPlayer = leftPlayer?.id == currentPlayerId,
             compact = compact,
             tightLandscape = tightLandscape,
@@ -720,7 +726,8 @@ private fun OpponentStrip(
 
         PlayerBadgeCard(
             player = rightPlayer,
-            avatarRes = R.drawable.avatar_daheng,
+            displayName = rightPlayer?.let { playerDisplayNames[it.id] ?: it.name }.orEmpty(),
+            avatarRes = avatarResourceForKey(rightPlayer?.avatarKey, R.drawable.avatar_daheng),
             isCurrentPlayer = rightPlayer?.id == currentPlayerId,
             compact = compact,
             tightLandscape = tightLandscape,
@@ -733,6 +740,7 @@ private fun OpponentStrip(
 @Composable
 private fun PlayerBadgeCard(
     player: PlayerUiState?,
+    displayName: String,
     avatarRes: Int,
     isCurrentPlayer: Boolean,
     compact: Boolean,
@@ -794,7 +802,7 @@ private fun PlayerBadgeCard(
                         modifier = Modifier.size(avatarSize)
                     )
                     Text(
-                        text = player.name,
+                        text = displayName,
                         color = TextWhite,
                         fontSize = when {
                             tightLandscape -> 10.sp
@@ -1315,6 +1323,7 @@ private fun ActionTimer(
 private fun LocalPlayerBadge(
     player: PlayerUiState,
     avatarKey: String,
+    displayName: String,
     compact: Boolean = false,
     tightLandscape: Boolean = false,
     modifier: Modifier = Modifier
@@ -1359,7 +1368,7 @@ private fun LocalPlayerBadge(
             verticalArrangement = Arrangement.spacedBy(if (compact) 3.dp else 4.dp)
         ) {
             Text(
-                text = player.name,
+                text = displayName,
                 color = TextWhite,
                 fontSize = when {
                     tightLandscape -> 15.sp
@@ -1388,12 +1397,28 @@ private fun TableBottomStatus(
     )
 }
 
-private fun avatarResourceForKey(avatarKey: String): Int =
+private fun avatarResourceForKey(avatarKey: String?, fallbackRes: Int = R.drawable.avatar_yujie): Int =
     when (avatarKey) {
         "daheng" -> R.drawable.avatar_daheng
         "luoli" -> R.drawable.avatar_luoli
-        else -> R.drawable.avatar_yujie
+        "yujie" -> R.drawable.avatar_yujie
+        else -> fallbackRes
     }
+
+private fun uniquePlayerDisplayNames(players: List<PlayerUiState>): Map<String, String> {
+    val groupedByName = players.groupBy { it.name.ifBlank { "牌友" } }
+    return players.associate { player ->
+        val name = player.name.ifBlank { "牌友" }
+        val sameNamePlayers = groupedByName[name].orEmpty()
+        val displayName = if (sameNamePlayers.size <= 1) {
+            name
+        } else {
+            val seatIndex = sameNamePlayers.indexOfFirst { it.id == player.id }.takeIf { it >= 0 } ?: 0
+            "$name${seatIndex + 1}"
+        }
+        player.id to displayName
+    }
+}
 
 @Composable
 private fun TurnPrompt(

@@ -38,7 +38,8 @@ data class PlayerUiState(
     val role: PlayerRole = PlayerRole.Unknown,
     val handSize: Int = 0,
     val isOnline: Boolean = true,
-    val beanBalance: Int = PlayerProgressManager.INITIAL_BEAN_BALANCE
+    val beanBalance: Int = PlayerProgressManager.INITIAL_BEAN_BALANCE,
+    val avatarKey: String? = null
 )
 
 data class GameUiState(

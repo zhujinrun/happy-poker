@@ -78,6 +78,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
 
     private val mqttClient = GameMqttClient()
     private val humanPlayerId: String = "human_player_${System.currentTimeMillis()}"
+    val localPlayerId: String get() = humanPlayerId
     private var currentRoomId: String = ""
     private var currentRoomMaxPlayers: Int = 3
     private var currentGameSettlementKey: String = ""
@@ -241,7 +242,8 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                             role = PlayerRole.Unknown,
                             handSize = 0,
                             isOnline = true,
-                            beanBalance = beanBalanceForPlayer(humanPlayerId)
+                            beanBalance = beanBalanceForPlayer(humanPlayerId),
+                            avatarKey = localAvatarKey()
                         )
                     ),
                     maxPlayers = maxPlayers,
@@ -286,7 +288,8 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                             role = PlayerRole.Unknown,
                             handSize = 0,
                             isOnline = true,
-                            beanBalance = beanBalanceForPlayer(humanPlayerId)
+                            beanBalance = beanBalanceForPlayer(humanPlayerId),
+                            avatarKey = localAvatarKey()
                         )
                     ),
                     maxPlayers = maxPlayers,
@@ -298,7 +301,8 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
         val message = RoomJoinMessage(
             roomId = roomId,
             playerName = appSettingsManager.getNickname(),
-            playerId = humanPlayerId
+            playerId = humanPlayerId,
+            avatarKey = localAvatarKey()
         )
         val joined = sendOnlineMessageNow(Protocol.TOPIC_ROOM_JOIN, message, "加入房间", ensureConnection = false)
         if (!joined) {
@@ -392,13 +396,34 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
 
     private fun isAiPlayer(playerId: String): Boolean = playerId.startsWith(AI_PLAYER_ID_PREFIX)
 
+    private fun localAvatarKey(): String = normalizeAvatarKey(appSettingsManager.getAvatarKey()) ?: AppSettingsManager.DEFAULT_AVATAR
+
+    private fun normalizeAvatarKey(avatarKey: String?): String? {
+        return avatarKey?.takeIf { it == "daheng" || it == "luoli" || it == "yujie" }
+    }
+
+    private fun fallbackAvatarKey(playerId: String): String {
+        return when {
+            isAiPlayer(playerId) -> "daheng"
+            (playerId.hashCode() and 1) == 0 -> "luoli"
+            else -> "yujie"
+        }
+    }
+
+    private fun avatarKeyForPlayer(playerId: String, avatarKey: String?, existing: PlayerUiState? = null): String {
+        return normalizeAvatarKey(avatarKey)
+            ?: normalizeAvatarKey(existing?.avatarKey)
+            ?: fallbackAvatarKey(playerId)
+    }
+
     private fun playerInfoFromUi(player: PlayerUiState): PlayerInfo {
         return PlayerInfo(
             id = player.id,
             name = player.name,
             isAI = isAiPlayer(player.id),
             isOnline = player.isOnline,
-            isReady = false
+            isReady = false,
+            avatarKey = avatarKeyForPlayer(player.id, player.avatarKey)
         )
     }
 
@@ -412,7 +437,8 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
             role = PlayerRole.Unknown,
             handSize = 0,
             isOnline = true,
-            beanBalance = PlayerProgressManager.INITIAL_BEAN_BALANCE
+            beanBalance = PlayerProgressManager.INITIAL_BEAN_BALANCE,
+            avatarKey = "daheng"
         )
     }
 
@@ -826,6 +852,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
 
     private fun buildGameStateMessage(gameState: GameState): GameStateMessage {
         val sourceRoom = hostRoom
+        val uiPlayersById = _uiState.value.room.players.associateBy { it.id }
         return GameStateMessage(
             roomId = gameState.roomId,
             state = gameState.state,
@@ -846,7 +873,11 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                         ?.findPlayer(playerState.id)
                         ?.hand
                         ?.map { CardInfo.fromCard(it) }
-                        .orEmpty()
+                        .orEmpty(),
+                    avatarKey = avatarKeyForPlayer(
+                        playerState.id,
+                        uiPlayersById[playerState.id]?.avatarKey
+                    )
                 )
             },
             currentBid = sourceRoom?.currentBid ?: _uiState.value.currentBid,
@@ -858,6 +889,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
         return object : GameCallback {
             override fun onGameStart(players: List<Player>, bottomCards: List<Card>) {
                 updateUiState { it.copy(bottomCards = bottomCards, room = it.room.copy(state = RoomState.Bidding)) }
+                val uiPlayersById = _uiState.value.room.players.associateBy { it.id }
                 sendOnlineMessage(
                     Protocol.TOPIC_GAME_START,
                     GameStartMessage(
@@ -867,7 +899,11 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                                 id = player.id,
                                 name = player.name,
                                 isAI = player.isAI,
-                                isOnline = player.isOnline
+                                isOnline = player.isOnline,
+                                avatarKey = avatarKeyForPlayer(
+                                    player.id,
+                                    uiPlayersById[player.id]?.avatarKey
+                                )
                             )
                         },
                         bottomCards = bottomCards.map { CardInfo.fromCard(it) }
@@ -1059,7 +1095,8 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                         role = PlayerRole.Unknown,
                         handSize = 0,
                         isOnline = true,
-                        beanBalance = PlayerProgressManager.INITIAL_BEAN_BALANCE
+                        beanBalance = PlayerProgressManager.INITIAL_BEAN_BALANCE,
+                        avatarKey = avatarKeyForPlayer(message.playerId, message.avatarKey)
                     )
                 )
             )
@@ -1109,7 +1146,8 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                             PlayerRole.Unknown,
                             0,
                             true,
-                            beanBalanceForPlayer(humanPlayerId)
+                            beanBalanceForPlayer(humanPlayerId),
+                            localAvatarKey()
                         )
                     ),
                     maxPlayers = currentRoomMaxPlayers,
@@ -1154,7 +1192,8 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                             role = existing?.role ?: PlayerRole.Unknown,
                             handSize = existing?.handSize ?: 0,
                             isOnline = p.isOnline,
-                            beanBalance = beanBalanceForPlayer(p.id, existing)
+                            beanBalance = beanBalanceForPlayer(p.id, existing),
+                            avatarKey = avatarKeyForPlayer(p.id, p.avatarKey, existing)
                         )
                     }
                 ),
@@ -1205,7 +1244,8 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                             role = existing?.role ?: PlayerRole.Unknown,
                             handSize = existing?.handSize ?: 0,
                             isOnline = p.isOnline,
-                            beanBalance = beanBalanceForPlayer(p.id, existing)
+                            beanBalance = beanBalanceForPlayer(p.id, existing),
+                            avatarKey = avatarKeyForPlayer(p.id, p.avatarKey, existing)
                         )
                     },
                     state = message.state,
@@ -1266,7 +1306,8 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                     role = existing?.role ?: PlayerRole.Unknown,
                     handSize = existing?.handSize ?: 0,
                     isOnline = playerInfo.isOnline,
-                    beanBalance = beanBalanceForPlayer(playerInfo.id, existing)
+                    beanBalance = beanBalanceForPlayer(playerInfo.id, existing),
+                    avatarKey = avatarKeyForPlayer(playerInfo.id, playerInfo.avatarKey, existing)
                 )
             }
             it.copy(
@@ -1393,7 +1434,8 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                             role = ps.role,
                             handSize = ps.handSize,
                             isOnline = ps.isOnline,
-                            beanBalance = beanBalanceForPlayer(ps.id, existing)
+                            beanBalance = beanBalanceForPlayer(ps.id, existing),
+                            avatarKey = avatarKeyForPlayer(ps.id, ps.avatarKey, existing)
                         )
                     }
                 ),
