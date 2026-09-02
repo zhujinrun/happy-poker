@@ -85,7 +85,7 @@ fun NavGraph(
                     )
                 },
                 onBackClick = {
-                    navController.popBackStack()
+                    navController.navigateHome()
                 },
                 onRoomClick = { room ->
                     multiplayerActionScope.launch {
@@ -107,7 +107,7 @@ fun NavGraph(
             val multiplayerUiState by multiplayerViewModel.uiState.collectAsState()
             CreateRoomScreen(
                 onBackClick = {
-                    navController.popBackStack()
+                    navController.popBackStackOrHome()
                 },
                 feedbackMessage = multiplayerUiState.feedbackMessage,
                 feedbackId = multiplayerUiState.feedbackId,
@@ -131,7 +131,7 @@ fun NavGraph(
             GameScreen(
                 viewModel = gameViewModel,
                 onBackClick = {
-                    navController.popBackStack()
+                    navController.navigateHome()
                 }
             )
         }
@@ -144,7 +144,7 @@ fun NavGraph(
                 viewModel = multiplayerViewModel,
                 onBackClick = {
                     multiplayerViewModel.leaveRoom()
-                    navController.popBackStack()
+                    navController.popBackStackOrHome()
                 }
             )
         }
@@ -155,11 +155,7 @@ fun NavGraph(
                 viewModel(viewModelStoreOwner = activityOwner)
             ResultScreen(
                 onBackToHomeClick = {
-                    navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Home.route) {
-                            inclusive = true
-                        }
-                    }
+                    navController.navigateHome()
                 },
                 onPlayAgainClick = {
                     gameViewModel.startGame()
@@ -177,7 +173,7 @@ fun NavGraph(
                 appSettingsManager = appSettingsManager,
                 mqttConfigManager = mqttConfigManager,
                 onBackClick = {
-                    navController.popBackStack()
+                    navController.navigateHome()
                 },
                 onSaveClick = {
                     // 保存设置后可以显示提示
@@ -191,4 +187,19 @@ private tailrec fun Context.findComponentActivity(): ComponentActivity? = when (
     is ComponentActivity -> this
     is ContextWrapper -> baseContext.findComponentActivity()
     else -> null
+}
+
+private fun NavHostController.navigateHome() {
+    navigate(Screen.Home.route) {
+        popUpTo(Screen.Home.route) {
+            inclusive = false
+        }
+        launchSingleTop = true
+    }
+}
+
+private fun NavHostController.popBackStackOrHome() {
+    if (!popBackStack()) {
+        navigateHome()
+    }
 }

@@ -19,6 +19,9 @@ val CardBlack = Color(0xFF212121) // 牌面黑色
 val TextWhite = Color(0xFFFFFFFF) // 白色文字
 val TextGray = Color(0xFF9E9E9E)  // 灰色文字
 
+// 应用兜底背景，避免导航切换时露出旧绿色主题底色
+val PokerAppBackground = Color(0xFF142A56)
+
 // 牌桌背景渐变
 val TableGradientStart = Color(0xFF1B5E20)
 val TableGradientEnd = Color(0xFF388E3C)

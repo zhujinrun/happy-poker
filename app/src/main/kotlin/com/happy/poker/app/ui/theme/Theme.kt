@@ -10,8 +10,8 @@ private val DarkColorScheme = darkColorScheme(
     primary = Green400,
     secondary = Gold500,
     tertiary = Red500,
-    background = TableGradientStart,
-    surface = Green800,
+    background = PokerAppBackground,
+    surface = PokerAppBackground,
     onPrimary = CardBlack,
     onSecondary = CardBlack,
     onTertiary = CardWhite,
@@ -23,13 +23,13 @@ private val LightColorScheme = lightColorScheme(
     primary = Green600,
     secondary = Gold700,
     tertiary = Red700,
-    background = Green400,
-    surface = CardWhite,
+    background = PokerAppBackground,
+    surface = PokerAppBackground,
     onPrimary = CardWhite,
     onSecondary = CardBlack,
     onTertiary = CardWhite,
-    onBackground = CardBlack,
-    onSurface = CardBlack
+    onBackground = TextWhite,
+    onSurface = TextWhite
 )
 
 @Composable
