@@ -87,7 +87,7 @@ class PahoMqttClient : MqttClient {
     private var pahoClient: MqttAsyncClient? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    override suspend fun connect(config: MqttConnectionConfig) {
+    override suspend fun connect(config: MqttConnectionConfig) = withContext(Dispatchers.IO) {
         _connectionState.value = ConnectionState.CONNECTING
         currentConfig = config
 
@@ -163,21 +163,23 @@ class PahoMqttClient : MqttClient {
     }
 
     override suspend fun disconnect() {
-        try {
-            pahoClient?.disconnect()?.waitForCompletion(5000)
-            pahoClient?.close()
-        } catch (e: Exception) {
-            // 忽略断开连接时的异常
-        } finally {
-            pahoClient = null
-            _connectionState.value = ConnectionState.DISCONNECTED
-            subscriptions.clear()
-            currentConfig = null
-            callback?.onDisconnected()
+        withContext(Dispatchers.IO) {
+            try {
+                pahoClient?.disconnect()?.waitForCompletion(5000)
+                pahoClient?.close()
+            } catch (e: Exception) {
+                // 忽略断开连接时的异常
+            } finally {
+                pahoClient = null
+                _connectionState.value = ConnectionState.DISCONNECTED
+                subscriptions.clear()
+                currentConfig = null
+                callback?.onDisconnected()
+            }
         }
     }
 
-    override suspend fun publish(topic: String, payload: String, qos: Int) {
+    override suspend fun publish(topic: String, payload: String, qos: Int) = withContext(Dispatchers.IO) {
         if (_connectionState.value != ConnectionState.CONNECTED) {
             throw IllegalStateException("MQTT客户端未连接")
         }

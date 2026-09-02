@@ -33,6 +33,26 @@ private const val ROOM_BROADCAST_INTERVAL_MS = 2500L
 private const val ROOM_STALE_TIMEOUT_MS = 9000L
 private const val AI_PLAYER_ID_PREFIX = "ai_player_"
 
+private val LOBBY_MQTT_TOPICS = setOf(
+    Protocol.TOPIC_ROOM_LIST,
+    Protocol.TOPIC_ROOM_UPDATE
+)
+
+private val WAITING_ROOM_MQTT_TOPICS = LOBBY_MQTT_TOPICS + setOf(
+    Protocol.TOPIC_ROOM_JOIN,
+    Protocol.TOPIC_ROOM_LEAVE,
+    Protocol.TOPIC_PLAYER_READY,
+    Protocol.TOPIC_GAME_START,
+    Protocol.TOPIC_GAME_STATE,
+    Protocol.TOPIC_GAME_END
+)
+
+private val GAME_MQTT_TOPICS = WAITING_ROOM_MQTT_TOPICS + setOf(
+    Protocol.TOPIC_GAME_BID,
+    Protocol.TOPIC_GAME_PLAY,
+    Protocol.TOPIC_GAME_PASS
+)
+
 private enum class MultiplayerTurnPhase {
     Bidding,
     Playing
@@ -97,6 +117,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     private var messageHandlerJob: Job? = null
     private var roomBroadcastJob: Job? = null
     private val discoveredRoomLastSeen = mutableMapOf<String, Long>()
+    private val activeMqttTopics = mutableSetOf<String>()
     private val connectionMutex = Mutex()
 
     init {
@@ -135,7 +156,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                     connectionState = ConnectionState.CONNECTED
                 )
             }
-            subscribeDefaultTopics()
+            syncMqttSubscriptions(desiredMqttTopics())
             setupMessageHandlers()
             return@withLock true
         }
@@ -158,7 +179,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                     connectionState = ConnectionState.CONNECTED
                 )
             }
-            subscribeDefaultTopics()
+            syncMqttSubscriptions(desiredMqttTopics(), force = true)
             setupMessageHandlers()
             true
         } catch (e: Exception) {
@@ -177,8 +198,21 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
-    private fun subscribeDefaultTopics() {
-        mqttClient.subscribe("${Protocol.TOPIC_PREFIX}/#")
+    private fun desiredMqttTopics(): Set<String> {
+        val roomState = _uiState.value.room.state
+        return when {
+            currentRoomId.isBlank() -> LOBBY_MQTT_TOPICS
+            roomState == RoomState.Bidding || roomState == RoomState.Playing || roomState == RoomState.Finished -> GAME_MQTT_TOPICS
+            else -> WAITING_ROOM_MQTT_TOPICS
+        }
+    }
+
+    private fun syncMqttSubscriptions(topics: Set<String>, force: Boolean = false) {
+        (activeMqttTopics - topics).forEach(mqttClient::unsubscribe)
+        val topicsToSubscribe = if (force) topics else topics - activeMqttTopics
+        topicsToSubscribe.forEach(mqttClient::subscribe)
+        activeMqttTopics.clear()
+        activeMqttTopics.addAll(topics)
     }
 
     private fun setupMessageHandlers() {
@@ -253,6 +287,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                 )
             )
         }
+        syncMqttSubscriptions(WAITING_ROOM_MQTT_TOPICS)
         startRoomBroadcast()
         val created = broadcastCurrentRoomState("创建房间", notifyFailure = true)
         if (!created) {
@@ -260,6 +295,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
             currentRoomId = ""
             currentRoomMaxPlayers = 3
             updateUiState { it.copy(room = RoomUiState(), isSearching = false) }
+            syncMqttSubscriptions(LOBBY_MQTT_TOPICS)
         }
         return created
     }
@@ -298,6 +334,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                 )
             )
         }
+        syncMqttSubscriptions(WAITING_ROOM_MQTT_TOPICS)
         val message = RoomJoinMessage(
             roomId = roomId,
             playerName = appSettingsManager.getNickname(),
@@ -309,6 +346,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
             currentRoomId = ""
             currentRoomMaxPlayers = 3
             updateUiState { it.copy(room = RoomUiState(), isSearching = false) }
+            syncMqttSubscriptions(LOBBY_MQTT_TOPICS)
         }
         return joined
     }
@@ -524,21 +562,19 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
             val shouldShow = message.hostId != humanPlayerId &&
                 message.state == RoomState.Waiting &&
                 message.players.size < message.maxPlayers
-            state.copy(
-                availableRooms = (if (shouldShow) activeRooms + roomInfo else activeRooms)
-                    .sortedWith(compareBy<RoomInfo> { it.name }.thenBy { it.id })
-            )
+            val nextRooms = (if (shouldShow) activeRooms + roomInfo else activeRooms)
+                .sortedWith(compareBy<RoomInfo> { it.name }.thenBy { it.id })
+            if (nextRooms == state.availableRooms) state else state.copy(availableRooms = nextRooms)
         }
     }
 
     private fun pruneStaleRooms() {
         val now = System.currentTimeMillis()
         updateUiState { state ->
-            state.copy(
-                availableRooms = state.availableRooms.filter { room ->
-                    now - (discoveredRoomLastSeen[room.id] ?: now) <= ROOM_STALE_TIMEOUT_MS
-                }
-            )
+            val nextRooms = state.availableRooms.filter { room ->
+                now - (discoveredRoomLastSeen[room.id] ?: now) <= ROOM_STALE_TIMEOUT_MS
+            }
+            if (nextRooms == state.availableRooms) state else state.copy(availableRooms = nextRooms)
         }
     }
 
@@ -546,6 +582,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
         clearHostGame()
         currentRoomId = ""
         currentRoomMaxPlayers = 3
+        syncMqttSubscriptions(LOBBY_MQTT_TOPICS)
         updateUiState { state ->
             MultiplayerGameUiState(
                 availableRooms = state.availableRooms,
@@ -566,10 +603,9 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
 
         updateUiState { state ->
             val responseIds = visibleRooms.map { it.id }.toSet()
-            state.copy(
-                availableRooms = (state.availableRooms.filterNot { it.id in responseIds } + visibleRooms)
-                    .sortedWith(compareBy<RoomInfo> { it.name }.thenBy { it.id })
-            )
+            val nextRooms = (state.availableRooms.filterNot { it.id in responseIds } + visibleRooms)
+                .sortedWith(compareBy<RoomInfo> { it.name }.thenBy { it.id })
+            if (nextRooms == state.availableRooms) state else state.copy(availableRooms = nextRooms)
         }
     }
 
@@ -640,6 +676,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                 turnSecondsRemaining = TURN_TIMEOUT_SECONDS
             )
         }
+        syncMqttSubscriptions(GAME_MQTT_TOPICS)
         sendOnlineMessage(
             Protocol.TOPIC_ROOM_UPDATE,
             buildRoomStateMessage(playingRoom, RoomState.Playing),
@@ -777,6 +814,9 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun refreshRoomList(notifyFailure: Boolean = false) {
+        if (currentRoomId.isBlank()) {
+            syncMqttSubscriptions(LOBBY_MQTT_TOPICS)
+        }
         pruneStaleRooms()
         val message = RoomListMessage()
         sendOnlineMessage(Protocol.TOPIC_ROOM_LIST, message, "刷新房间", notifyFailure = notifyFailure)
@@ -1170,6 +1210,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                 isSearching = false
             )
         }
+        syncMqttSubscriptions(WAITING_ROOM_MQTT_TOPICS)
     }
 
     private fun handleRoomJoined(message: RoomJoinedMessage) {
@@ -1212,6 +1253,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                 isSearching = false
             )
         }
+        syncMqttSubscriptions(WAITING_ROOM_MQTT_TOPICS)
     }
 
     private fun handleRoomState(message: RoomStateMessage) {
@@ -1228,6 +1270,13 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
         }
 
         currentRoomMaxPlayers = message.maxPlayers
+        syncMqttSubscriptions(
+            if (message.state == RoomState.Bidding || message.state == RoomState.Playing) {
+                GAME_MQTT_TOPICS
+            } else {
+                WAITING_ROOM_MQTT_TOPICS
+            }
+        )
         updateUiState {
             val existingPlayersById = it.room.players.associateBy { player -> player.id }
             val isHost = message.hostId == humanPlayerId
@@ -1275,6 +1324,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
         }
 
         stopRoomBroadcast()
+        syncMqttSubscriptions(GAME_MQTT_TOPICS)
         currentRoomMaxPlayers = 3
         currentGameSettlementKey = "multi-${message.roomId}-${message.timestamp}"
         settledGameKey = null
