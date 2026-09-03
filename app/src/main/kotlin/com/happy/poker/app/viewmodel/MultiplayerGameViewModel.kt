@@ -749,6 +749,8 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
             roomId = currentRoomId,
             playerId = humanPlayerId
         )
+        // 过牌不携带牌面，先收回本地选中牌，避免下一轮继续沿用旧选择。
+        updateUiState { it.copy(selectedCards = emptySet()) }
         if (_uiState.value.room.isHost) {
             handlePassCommand(message)
         } else {
@@ -1424,7 +1426,16 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                 currentPlayerId = nextPlayerId,
                 isPlayTurn = nextPlayerId == humanPlayerId,
                 isBidTurn = false,
-                room = it.room.copy(state = RoomState.Playing),
+                room = it.room.copy(
+                    state = RoomState.Playing,
+                    players = it.room.players.map { player ->
+                        if (player.id == message.playerId) {
+                            player.copy(handSize = message.handSize)
+                        } else {
+                            player
+                        }
+                    }
+                ),
                 selectedCards = emptySet(),
                 turnSecondsRemaining = if (nextPlayerId == humanPlayerId) TURN_TIMEOUT_SECONDS else it.turnSecondsRemaining
             )
@@ -1467,6 +1478,7 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                 lastPlayedBy = message.lastPlayedPlayerId,
                 isBidTurn = isBidTurn,
                 isPlayTurn = isPlayTurn,
+                selectedCards = if (isPlayTurn) it.selectedCards else emptySet(),
                 playerCards = humanHandCards,
                 bottomCards = message.bottomCards
                     .takeIf { cards -> cards.isNotEmpty() }
@@ -1482,7 +1494,10 @@ class MultiplayerGameViewModel(application: Application) : AndroidViewModel(appl
                             id = ps.id,
                             name = ps.name,
                             role = ps.role,
-                            handSize = ps.handSize,
+                            handSize = ps.handCards
+                                .takeIf { it.isNotEmpty() }
+                                ?.size
+                                ?: ps.handSize,
                             isOnline = ps.isOnline,
                             beanBalance = beanBalanceForPlayer(ps.id, existing),
                             avatarKey = avatarKeyForPlayer(ps.id, ps.avatarKey, existing)

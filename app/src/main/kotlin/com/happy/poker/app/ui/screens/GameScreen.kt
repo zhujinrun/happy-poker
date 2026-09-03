@@ -862,7 +862,7 @@ private fun CardCountPlate(
 ) {
     Box(
         modifier = modifier
-            .width(if (compact) 28.dp else 32.dp)
+            .width(if (compact) 36.dp else 42.dp)
             .height(if (compact) 40.dp else 48.dp)
             .clip(RoundedCornerShape(5.dp))
             .background(
