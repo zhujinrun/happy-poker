@@ -4,16 +4,24 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -127,7 +135,8 @@ fun PlayingCard(
     modifier: Modifier = Modifier,
     cardWidth: Dp = 60.dp,
     cardHeight: Dp = 90.dp,
-    selectedLift: Dp = 20.dp
+    selectedLift: Dp = 20.dp,
+    clickEnabled: Boolean = true
 ) {
     // 选中动画
     val transition = updateTransition(targetState = isSelected, label = "cardSelect")
@@ -157,7 +166,7 @@ fun PlayingCard(
             .height(cardHeight)
             .scale(scale)
             .offset(y = offsetY.dp)
-            .clickable(onClick = onClick),
+            .then(if (clickEnabled) Modifier.clickable(onClick = onClick) else Modifier),
         shape = RoundedCornerShape(6.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isFaceDown) Color(0xFF1565C0) else Color.White
@@ -198,6 +207,9 @@ fun HandCards(
     maxStep: Dp = 38.dp,
     selectedLift: Dp = 20.dp
 ) {
+    val density = LocalDensity.current
+    val currentSelectedCards by rememberUpdatedState(selectedCards)
+    val currentOnCardClick by rememberUpdatedState(onCardClick)
     val displayCards = cards.sortedWith(
         compareByDescending<GameCard> { it.rank.value }
             .thenBy { it.suit.ordinal }
@@ -216,17 +228,64 @@ fun HandCards(
             availableStep.coerceIn(minStep, maxStep)
         }
         val handWidth = if (displayCards.isEmpty()) 0.dp else cardWidth + (step.value * (displayCards.size - 1)).dp
+        val cardWidthPx = with(density) { cardWidth.toPx() }
+        val stepPx = with(density) { step.toPx() }
+        val handWidthPx = with(density) { handWidth.toPx() }
+
+        fun cardAt(position: Offset): GameCard? {
+            if (displayCards.isEmpty() || position.x < 0f || position.x > handWidthPx) return null
+
+            val hitIndex = displayCards.indices.reversed().firstOrNull { index ->
+                val left = stepPx * index
+                position.x >= left && position.x <= left + cardWidthPx
+            }
+            return hitIndex?.let(displayCards::get)
+        }
 
         Box(
             modifier = Modifier
                 .width(handWidth)
                 .height(containerHeight)
+                .pointerInput(displayCards, cardWidthPx, stepPx, handWidthPx) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val touchedCardIds = mutableSetOf<String>()
+                        val selectedAtGestureStart = currentSelectedCards
+                        var shouldSelect: Boolean? = null
+
+                        fun applyCardAt(position: Offset) {
+                            val card = cardAt(position) ?: return
+                            if (!touchedCardIds.add(card.id)) return
+
+                            val targetSelected = shouldSelect
+                                ?: (card.id !in selectedAtGestureStart).also { shouldSelect = it }
+                            val isSelectedAtStart = card.id in selectedAtGestureStart
+                            if (targetSelected != isSelectedAtStart) {
+                                currentOnCardClick(card)
+                            }
+                        }
+
+                        applyCardAt(down.position)
+                        down.consume()
+
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (change.changedToUpIgnoreConsumed()) break
+                            if (change.positionChanged()) {
+                                applyCardAt(change.position)
+                                change.consume()
+                            }
+                            if (!change.pressed) break
+                        }
+                    }
+                }
         ) {
             displayCards.forEachIndexed { index, card ->
                 PlayingCard(
                     card = card,
                     isSelected = card.id in selectedCards,
-                    onClick = { onCardClick(card) },
+                    onClick = { currentOnCardClick(card) },
                     modifier = Modifier
                         .offset(x = (step.value * index).dp)
                         .width(cardWidth)
@@ -234,7 +293,8 @@ fun HandCards(
                         .zIndex(index.toFloat()),
                     cardWidth = cardWidth,
                     cardHeight = cardHeight,
-                    selectedLift = selectedLift
+                    selectedLift = selectedLift,
+                    clickEnabled = false
                 )
             }
         }
