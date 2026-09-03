@@ -642,12 +642,7 @@ private fun TopMiniPlayingCard(
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Image(
-            painter = painterResource(id = getCardDrawableId(card)),
-            contentDescription = card.displayName,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Fit
-        )
+        PokerCardFace(card = card, modifier = Modifier.fillMaxSize())
     }
 }
 
@@ -1133,12 +1128,7 @@ private fun PlayedCardsFan(
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
                 ) {
-                    Image(
-                        painter = painterResource(id = getCardDrawableId(card)),
-                        contentDescription = card.displayName,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit
-                    )
+                    PokerCardFace(card = card, modifier = Modifier.fillMaxSize())
                 }
             }
         }
